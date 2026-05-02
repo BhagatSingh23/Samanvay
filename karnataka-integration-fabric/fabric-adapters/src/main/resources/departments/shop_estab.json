@@ -1,0 +1,10 @@
+{
+  "deptId": "SHOP_ESTAB",
+  "displayName": "Shops & Establishments",
+  "adapterMode": "POLLING",
+  "webhookPath": null,
+  "pollUrl": "http://mock-shop-estab:8080/shop-estab/api/v1/changes",
+  "snapshotUrl": null,
+  "pollIntervalSeconds": 30,
+  "mappingFile": "mappings/shop_estab.json"
+}

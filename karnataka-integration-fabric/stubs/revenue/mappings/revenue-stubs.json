@@ -1,0 +1,79 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "/revenue/api/v1/health"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "UP",
+          "service": "mock-revenue"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "/revenue/api/v1/snapshot"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "ubid": "UBID-KA-REV-20001",
+            "serviceType": "PROPERTY_TAX_ASSESSMENT",
+            "ownerName": "Rajesh Kumar",
+            "propertyAddress": "12th Cross, Jayanagar, Bengaluru",
+            "pincode": "560011",
+            "assessedValue": 2500000,
+            "eventTimestamp": "2026-05-02T08:00:00Z"
+          },
+          {
+            "ubid": "UBID-KA-REV-20002",
+            "serviceType": "MUTATION_TRANSFER",
+            "ownerName": "Lakshmi Devi",
+            "propertyAddress": "4th Main, Rajajinagar, Bengaluru",
+            "pincode": "560010",
+            "assessedValue": 3200000,
+            "eventTimestamp": "2026-05-02T08:15:00Z"
+          },
+          {
+            "ubid": "UBID-KA-REV-20003",
+            "serviceType": "ENCUMBRANCE_CHECK",
+            "ownerName": "Suresh Babu",
+            "propertyAddress": "KR Puram, Bengaluru",
+            "pincode": "560036",
+            "assessedValue": 1800000,
+            "eventTimestamp": "2026-05-02T08:30:00Z"
+          },
+          {
+            "ubid": "UBID-KA-REV-20004",
+            "serviceType": "PROPERTY_TAX_ASSESSMENT",
+            "ownerName": "Meena Kumari",
+            "propertyAddress": "Chamundi Hill Road, Mysuru",
+            "pincode": "570010",
+            "assessedValue": 4100000,
+            "eventTimestamp": "2026-05-02T09:00:00Z"
+          },
+          {
+            "ubid": "UBID-KA-REV-20005",
+            "serviceType": "MUTATION_TRANSFER",
+            "ownerName": "Venkatesh Prasad",
+            "propertyAddress": "Hubli-Dharwad Road, Dharwad",
+            "pincode": "580001",
+            "assessedValue": 1500000,
+            "eventTimestamp": "2026-05-02T09:15:00Z"
+          }
+        ]
+      }
+    }
+  ]
+}

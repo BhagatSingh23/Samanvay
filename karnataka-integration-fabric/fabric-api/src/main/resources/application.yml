@@ -1,0 +1,111 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: karnataka-integration-fabric
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fabric_db
+    username: fabric
+    password: fabric
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: public
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: fabric-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: 6379
+
+# ── Fabric Kafka Topic Configuration ─────────────────────────
+
+fabric:
+  kafka:
+    topics:
+      sws-inbound: sws.inbound.events
+      dept-inbound: dept.inbound.events
+      propagation-outbound: propagation.outbound.events
+      audit-trail: audit.trail.events
+      conflict-detected: conflict.detected.events
+      dlq: dlq.events
+    partitions:
+      high: 6
+      low: 3
+
+# ── Actuator ──────────────────────────────────────────────────
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+
+# ── Polling Adapter ───────────────────────────────────────────
+
+adapter:
+  poll:
+    interval: 30000
+  snapshot:
+    cron: "0 */5 * * * *"
+
+# ── Resilience4j ──────────────────────────────────────────────
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      default:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+      poll-SHOP_ESTAB:
+        sliding-window-size: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+      snapshot-REVENUE:
+        sliding-window-size: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+  retry:
+    instances:
+      default:
+        max-attempts: 3
+        wait-duration: 500ms
+
+# ── Logging ───────────────────────────────────────────────────
+
+logging:
+  level:
+    com.karnataka.fabric: DEBUG
+    org.springframework.kafka: WARN

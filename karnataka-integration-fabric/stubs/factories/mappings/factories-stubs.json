@@ -1,0 +1,36 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "/factories/api/v1/health"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "UP",
+          "service": "mock-factories"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "/factories/api/v1/registrations"
+      },
+      "response": {
+        "status": 202,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "registrationId": "mock-fact-reg-001",
+          "status": "ACCEPTED"
+        }
+      }
+    }
+  ]
+}

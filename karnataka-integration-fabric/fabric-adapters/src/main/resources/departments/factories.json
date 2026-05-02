@@ -1,0 +1,10 @@
+{
+  "deptId": "FACTORIES",
+  "displayName": "Department of Factories",
+  "adapterMode": "WEBHOOK",
+  "webhookPath": "/api/v1/inbound/FACTORIES",
+  "pollUrl": null,
+  "snapshotUrl": null,
+  "pollIntervalSeconds": 30,
+  "mappingFile": "mappings/factories.json"
+}

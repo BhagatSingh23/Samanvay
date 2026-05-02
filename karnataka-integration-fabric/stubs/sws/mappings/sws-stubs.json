@@ -1,0 +1,36 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "/sws/api/v1/health"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "UP",
+          "service": "mock-sws"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "/sws/api/v1/service-requests"
+      },
+      "response": {
+        "status": 202,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "requestId": "mock-sws-req-001",
+          "status": "ACCEPTED"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "/shop-estab/api/v1/health"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "UP",
+          "service": "mock-shop-estab"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "/shop-estab/api/v1/establishments"
+      },
+      "response": {
+        "status": 202,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "establishmentId": "mock-se-001",
+          "status": "ACCEPTED"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/shop-estab/api/v1/changes"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "ubid": "UBID-KA-SE-10001",
+            "serviceType": "LICENCE_RENEWAL",
+            "establishmentName": "Bengaluru Book House",
+            "addressLine1": "MG Road, Bengaluru",
+            "pincode": "560001",
+            "eventTimestamp": "2026-05-02T10:00:00Z"
+          },
+          {
+            "ubid": "UBID-KA-SE-10002",
+            "serviceType": "ADDRESS_CHANGE",
+            "establishmentName": "Mysore Silk Emporium",
+            "addressLine1": "Devaraja Market, Mysuru",
+            "pincode": "570001",
+            "eventTimestamp": "2026-05-02T10:05:00Z"
+          }
+        ]
+      }
+    }
+  ]
+}

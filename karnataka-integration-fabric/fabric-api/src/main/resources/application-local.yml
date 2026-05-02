@@ -1,0 +1,68 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: karnataka-integration-fabric
+
+  # ── H2 in-memory database (no Docker needed) ────────────────
+  datasource:
+    url: jdbc:h2:mem:fabric_db;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+
+  flyway:
+    enabled: false
+
+  # ── Schema init from SQL script ─────────────────────────────
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:local-schema.sql
+
+  # ── Kafka disabled (mock in-memory) ─────────────────────────
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+# ── Fabric Kafka Topic Configuration (used by value injection) ──
+fabric:
+  kafka:
+    topics:
+      sws-inbound: sws.inbound.events
+      dept-inbound: dept.inbound.events
+      propagation-outbound: propagation.outbound.events
+      audit-trail: audit.trail.events
+      conflict-detected: conflict.detected.events
+      dlq: dlq.events
+    partitions:
+      high: 1
+      low: 1
+
+# ── Actuator ──────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    com.karnataka.fabric: DEBUG
+    org.springframework.web: DEBUG

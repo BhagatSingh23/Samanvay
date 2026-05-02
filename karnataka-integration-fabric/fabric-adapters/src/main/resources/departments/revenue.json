@@ -1,0 +1,10 @@
+{
+  "deptId": "REVENUE",
+  "displayName": "Department of Revenue",
+  "adapterMode": "SNAPSHOT_DIFF",
+  "webhookPath": null,
+  "pollUrl": null,
+  "snapshotUrl": "http://mock-revenue:8080/revenue/api/v1/snapshot",
+  "pollIntervalSeconds": 0,
+  "mappingFile": "mappings/revenue.json"
+}
