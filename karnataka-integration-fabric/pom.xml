@@ -49,6 +49,9 @@
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
 
+        <!-- Caching -->
+        <caffeine.version>3.1.8</caffeine.version>
+
         <!-- Jackson (aligned with Spring Boot BOM) -->
         <jackson-bom.version>2.16.2</jackson-bom.version>
     </properties>
@@ -150,6 +153,15 @@
                 <artifactId>mapstruct-processor</artifactId>
                 <version>${mapstruct.version}</version>
                 <scope>provided</scope>
+            </dependency>
+
+            <!-- ========================= -->
+            <!-- Caching                   -->
+            <!-- ========================= -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
             </dependency>
 
             <!-- ========================= -->

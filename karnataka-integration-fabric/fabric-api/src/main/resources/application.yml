@@ -80,6 +80,18 @@ adapter:
   snapshot:
     cron: "0 */5 * * * *"
 
+# ── Schema Drift Detector ────────────────────────────────────
+
+drift:
+  detector:
+    cron: "0 0 */6 * * *"
+
+# ── Outbox Worker ────────────────────────────────────────────
+
+outbox:
+  worker:
+    fixedDelay: 5000
+
 # ── Resilience4j ──────────────────────────────────────────────
 
 resilience4j:

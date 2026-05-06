@@ -31,5 +31,8 @@ public enum AuditEventType {
     RETRY_QUEUED,
 
     /** Event moved to the dead-letter queue after all retries exhausted. */
-    DLQ_PARKED
+    DLQ_PARKED,
+
+    /** Schema drift detected — expected fields missing from a department API response. */
+    SCHEMA_DRIFT_DETECTED
 }

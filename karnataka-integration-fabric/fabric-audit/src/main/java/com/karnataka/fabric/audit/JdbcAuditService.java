@@ -47,10 +47,10 @@ public class JdbcAuditService implements AuditService {
                 INSERT INTO audit_records
                     (audit_id, event_id, ubid, source_system, target_system,
                      audit_event_type, before_state, after_state)
-                VALUES (?, ?::uuid, ?, ?, ?, ?, ?::jsonb, ?::jsonb)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 auditId,
-                eventId,
+                UUID.fromString(eventId),
                 ubid,
                 sourceSystem,
                 targetSystem,

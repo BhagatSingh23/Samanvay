@@ -37,6 +37,14 @@ adapter:
   snapshot:
     cron: "-"
 
+drift:
+  detector:
+    cron: "-"
+
+outbox:
+  worker:
+    fixedDelay: 999999999
+
 resilience4j:
   circuitbreaker:
     instances:

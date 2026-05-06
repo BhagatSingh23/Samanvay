@@ -71,3 +71,62 @@ CREATE TABLE IF NOT EXISTS snapshot_hashes (
 
     PRIMARY KEY (dept_id, record_key)
 );
+
+CREATE TABLE IF NOT EXISTS schema_mappings (
+    mapping_id          UUID            PRIMARY KEY DEFAULT RANDOM_UUID(),
+    dept_id             VARCHAR(255)    NOT NULL,
+    service_type        VARCHAR(255)    NOT NULL,
+    version             INT             NOT NULL DEFAULT 1,
+    active              BOOLEAN         DEFAULT true,
+    mapping_rules       CLOB            NOT NULL,
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (dept_id, service_type, version)
+);
+
+-- Seed: FACTORIES / ADDRESS_CHANGE
+INSERT INTO schema_mappings (mapping_id, dept_id, service_type, version, active, mapping_rules)
+VALUES (
+    RANDOM_UUID(), 'FACTORIES', 'ADDRESS_CHANGE', 1, true,
+    '{"fields":[{"canonicalField":"registeredAddress.line1","targetField":"addr_line_1","transform":"UPPERCASE"},{"canonicalField":"registeredAddress.line2","targetField":"addr_line_2","transform":"UPPERCASE"},{"canonicalField":"registeredAddress.pincode","targetField":"postal_code","transform":"NONE"},{"canonicalField":"registeredAddress.city","targetField":"city_name","transform":"UPPERCASE"},{"canonicalField":"registeredAddress.state","targetField":"state_code","transform":"UPPERCASE"},{"canonicalField":"businessName","targetField":"est_name","transform":"NONE"},{"canonicalField":"contactPerson","targetField":"contact_person","transform":"SPLIT_FULLNAME_TO_FIRST_LAST"}]}'
+);
+
+-- Seed: SHOP_ESTAB / ADDRESS_CHANGE
+INSERT INTO schema_mappings (mapping_id, dept_id, service_type, version, active, mapping_rules)
+VALUES (
+    RANDOM_UUID(), 'SHOP_ESTAB', 'ADDRESS_CHANGE', 1, true,
+    '{"fields":[{"canonicalField":"registeredAddress.line1","targetField":"shop_addr_1","transform":"UPPERCASE"},{"canonicalField":"registeredAddress.line2","targetField":"shop_addr_2","transform":"UPPERCASE"},{"canonicalField":"registeredAddress.pincode","targetField":"pin","transform":"NONE"},{"canonicalField":"registeredAddress.city","targetField":"town","transform":"LOWERCASE"},{"canonicalField":"businessName","targetField":"est_name","transform":"NONE"},{"canonicalField":"registeredAddress.fullAddress","targetField":"full_address","transform":"CONCAT_ADDRESS_LINES"}]}'
+);
+
+CREATE TABLE IF NOT EXISTS drift_alerts (
+    id              UUID            PRIMARY KEY DEFAULT RANDOM_UUID(),
+    dept_id         VARCHAR(255)    NOT NULL,
+    missing_fields  CLOB            NOT NULL,
+    detected_at     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved        BOOLEAN         DEFAULT false
+);
+
+CREATE TABLE IF NOT EXISTS propagation_outbox (
+    outbox_id           UUID            PRIMARY KEY DEFAULT RANDOM_UUID(),
+    event_id            UUID            NOT NULL,
+    ubid                VARCHAR(255)    NOT NULL,
+    target_system_id    VARCHAR(255)    NOT NULL,
+    translated_payload  CLOB            NOT NULL,
+    status              VARCHAR(50)     DEFAULT 'PENDING',
+    attempt_count       INT             DEFAULT 0,
+    next_attempt_at     TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    last_error          CLOB,
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS dead_letter_queue (
+    dlq_id              UUID            PRIMARY KEY DEFAULT RANDOM_UUID(),
+    event_id            UUID,
+    ubid                VARCHAR(255),
+    target_system_id    VARCHAR(255),
+    translated_payload  CLOB,
+    failure_reason      CLOB,
+    parked_at           TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    resolved            BOOLEAN         DEFAULT false
+);
