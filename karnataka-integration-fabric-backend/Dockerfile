@@ -6,9 +6,6 @@
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /build
 
-COPY .mvn/   .mvn/
-COPY mvnw    mvnw
-RUN chmod +x mvnw
 
 COPY pom.xml pom.xml
 COPY fabric-core/pom.xml        fabric-core/pom.xml
