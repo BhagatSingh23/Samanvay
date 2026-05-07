@@ -1,0 +1,313 @@
+@import "tailwindcss";
+
+/* ── Karnataka Integration Fabric — Government Navy Theme ─── */
+
+:root {
+  /* Navy palette */
+  --navy-950: #0a0e1a;
+  --navy-900: #0d1225;
+  --navy-800: #111830;
+  --navy-700: #1a2342;
+  --navy-600: #243054;
+  --navy-500: #344570;
+  --navy-400: #4a5f8c;
+  --navy-300: #6b82b0;
+  --navy-200: #94a8cc;
+  --navy-100: #c5d0e5;
+
+  /* Accent palette */
+  --gold-500: #d4a843;
+  --gold-400: #e4bf60;
+  --gold-300: #f0d48a;
+
+  /* Status colours */
+  --status-delivered: #34d399;
+  --status-failed: #f87171;
+  --status-pending: #fbbf24;
+  --status-conflict-held: #a78bfa;
+  --status-superseded: #9ca3af;
+  --status-received: #60a5fa;
+
+  /* Glass */
+  --glass-bg: rgba(17, 24, 48, 0.65);
+  --glass-border: rgba(106, 130, 176, 0.18);
+  --glass-hover: rgba(36, 48, 84, 0.55);
+
+  /* Text */
+  --text-primary: #e8ecf4;
+  --text-secondary: #94a8cc;
+  --text-muted: #6b82b0;
+
+  /* Font */
+  --font-sans: var(--font-geist-sans), "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), "JetBrains Mono", monospace;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--navy-600) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--navy-600);
+  border-radius: 3px;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--navy-950);
+  color: var(--text-primary);
+}
+
+/* ── Reusable utility classes ───────────────────────────── */
+
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+}
+
+.glass-card-hover:hover {
+  background: var(--glass-hover);
+  border-color: rgba(106, 130, 176, 0.3);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-DELIVERED  { background: rgba(52, 211, 153, 0.15); color: var(--status-delivered); }
+.status-CONFIRMED  { background: rgba(52, 211, 153, 0.15); color: var(--status-delivered); }
+.status-FAILED     { background: rgba(248, 113, 113, 0.15); color: var(--status-failed); }
+.status-PENDING    { background: rgba(251, 191, 36, 0.15); color: var(--status-pending); }
+.status-RECEIVED   { background: rgba(96, 165, 250, 0.15); color: var(--status-received); }
+.status-CONFLICT_HELD { background: rgba(167, 139, 250, 0.15); color: var(--status-conflict-held); }
+.status-SUPERSEDED { background: rgba(156, 163, 175, 0.15); color: var(--status-superseded); }
+.status-RETRYING   { background: rgba(251, 191, 36, 0.15); color: var(--status-pending); }
+.status-DEAD_LETTERED { background: rgba(248, 113, 113, 0.15); color: var(--status-failed); }
+.status-ROUTED     { background: rgba(96, 165, 250, 0.15); color: var(--status-received); }
+.status-VALIDATED  { background: rgba(96, 165, 250, 0.15); color: var(--status-received); }
+
+/* ── Animations ────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 168, 67, 0.2); }
+  50%      { box-shadow: 0 0 20px 4px rgba(212, 168, 67, 0.1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out both;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--navy-800) 25%, var(--navy-700) 50%, var(--navy-800) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+/* ── Table styles ──────────────────────────────────────── */
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table thead th {
+  padding: 10px 16px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--glass-border);
+  text-align: left;
+  position: sticky;
+  top: 0;
+  background: var(--navy-900);
+  z-index: 1;
+}
+
+.data-table tbody tr {
+  transition: background 0.15s;
+}
+
+.data-table tbody tr:hover {
+  background: var(--glass-hover);
+}
+
+.data-table tbody td {
+  padding: 10px 16px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(106, 130, 176, 0.08);
+}
+
+/* ── Tab styles ────────────────────────────────────────── */
+
+.tab-btn {
+  padding: 10px 18px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  cursor: pointer;
+  background: transparent;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(36, 48, 84, 0.3);
+}
+
+.tab-btn.active {
+  color: var(--gold-400);
+  border-bottom-color: var(--gold-400);
+}
+
+/* ── Button styles ─────────────────────────────────────── */
+
+.btn-primary {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--gold-500), var(--gold-400));
+  color: var(--navy-950);
+  font-weight: 600;
+  font-size: 0.78rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-ghost {
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-ghost:hover {
+  background: var(--glass-hover);
+  color: var(--text-primary);
+  border-color: rgba(106, 130, 176, 0.35);
+}
+
+.btn-danger {
+  padding: 6px 14px;
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--status-failed);
+  font-size: 0.78rem;
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: rgba(248, 113, 113, 0.22);
+}
+
+/* ── Input styles ──────────────────────────────────────── */
+
+.input-field {
+  padding: 10px 14px;
+  background: var(--navy-800);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  transition: border-color 0.2s;
+  outline: none;
+  width: 100%;
+}
+
+.input-field:focus {
+  border-color: var(--gold-400);
+  box-shadow: 0 0 0 3px rgba(212, 168, 67, 0.12);
+}
+
+.input-field::placeholder {
+  color: var(--text-muted);
+}
+
+/* ── Timeline ──────────────────────────────────────────── */
+
+.timeline-line {
+  position: absolute;
+  left: 19px;
+  top: 40px;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--navy-600), transparent);
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid;
+  flex-shrink: 0;
+}
+
+/* ── Diff styles ───────────────────────────────────────── */
+
+.diff-added {
+  background: rgba(52, 211, 153, 0.08);
+  color: var(--status-delivered);
+}
+
+.diff-removed {
+  background: rgba(248, 113, 113, 0.08);
+  color: var(--status-failed);
+}

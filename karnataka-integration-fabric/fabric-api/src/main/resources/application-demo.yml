@@ -1,0 +1,40 @@
+# ── Demo Profile ─────────────────────────────────────────────
+# Inherits from 'local' profile (H2 in-memory, stub Kafka, etc.)
+# Activate with: --spring.profiles.active=local,demo
+#
+# Adds:
+# - Demo data seeder (DemoDataSeeder) on startup
+# - Demo reset endpoint (POST /api/v1/demo/reset)
+# - Wider conflict window for easier demo triggering
+# - Slower outbox worker to observe lifecycle in real-time
+
+spring:
+  profiles:
+    include: local
+
+# ── Wider conflict window for demo ─────────────────────────
+conflict:
+  window:
+    seconds: 60
+
+# ── Slower outbox polling (gives time to observe PENDING) ──
+outbox:
+  worker:
+    fixedDelay: 10000
+
+# ── Disable scheduled jobs (manual control in demo) ────────
+adapter:
+  poll:
+    interval: 999999999
+  snapshot:
+    cron: "-"
+
+drift:
+  detector:
+    cron: "-"
+
+# ── Logging ──────────────────────────────────────────────────
+logging:
+  level:
+    com.karnataka.fabric.api.demo: INFO
+    com.karnataka.fabric: DEBUG

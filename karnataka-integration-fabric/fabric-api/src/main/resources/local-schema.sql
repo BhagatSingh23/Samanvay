@@ -133,19 +133,31 @@ CREATE TABLE IF NOT EXISTS dead_letter_queue (
 
 CREATE TABLE IF NOT EXISTS conflict_policies (
     policy_id           UUID            PRIMARY KEY DEFAULT RANDOM_UUID(),
-    service_type        VARCHAR(255)    NOT NULL,
-    field_name          VARCHAR(255)    NOT NULL,
-    policy              VARCHAR(100)    NOT NULL DEFAULT 'LAST_WRITER_WINS',
+    dept_id             VARCHAR(255),
+    service_type        VARCHAR(255),
+    field_name          VARCHAR(255),
+    policy_type         VARCHAR(100)    NOT NULL DEFAULT 'LAST_WRITE_WINS',
     priority_source     VARCHAR(255),
-    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
-
-    UNIQUE (service_type, field_name)
+    active              BOOLEAN         DEFAULT true,
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP
 );
 
--- Seed conflict policies for ADDRESS_CHANGE
-INSERT INTO conflict_policies (service_type, field_name, policy) VALUES
-    ('ADDRESS_CHANGE', 'registeredAddress.line1', 'LAST_WRITER_WINS'),
-    ('ADDRESS_CHANGE', 'registeredAddress.pincode', 'LAST_WRITER_WINS'),
-    ('ADDRESS_CHANGE', 'registeredAddress.city', 'LAST_WRITER_WINS'),
-    ('ADDRESS_CHANGE', 'businessName', 'SOURCE_PRIORITY'),
-    ('ADDRESS_CHANGE', 'contactPerson', 'LAST_WRITER_WINS');
+-- Seed conflict policies
+INSERT INTO conflict_policies (service_type, dept_id, field_name, policy_type, priority_source) VALUES
+    ('ADDRESS_CHANGE', NULL, NULL, 'SOURCE_PRIORITY', 'SWS'),
+    ('SIGNATORY_UPDATE', 'FACTORIES', NULL, 'SOURCE_PRIORITY', 'FACTORIES'),
+    ('OWNERSHIP_CHANGE', NULL, NULL, 'HOLD_FOR_REVIEW', NULL);
+
+CREATE TABLE IF NOT EXISTS conflict_hold_queue (
+    hold_id             UUID            PRIMARY KEY DEFAULT RANDOM_UUID(),
+    conflict_id         UUID            NOT NULL,
+    event_id            UUID            NOT NULL,
+    ubid                VARCHAR(255)    NOT NULL,
+    service_type        VARCHAR(255),
+    source_system_id    VARCHAR(255),
+    payload             CLOB,
+    held_at             TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    resolved_at         TIMESTAMP,
+    resolved_by_user    VARCHAR(255),
+    status              VARCHAR(50)     NOT NULL DEFAULT 'HELD'
+);

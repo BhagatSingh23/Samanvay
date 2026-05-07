@@ -13,7 +13,7 @@ import java.time.Instant;
  * @param ubid             Business entity both events target — must not be blank.
  * @param event1Id         First event in the conflict pair.
  * @param event2Id         Second event in the conflict pair.
- * @param resolutionPolicy Policy applied to resolve (e.g. {@code "LAST_WRITER_WINS"}).
+ * @param resolutionPolicy Policy applied to resolve (e.g. {@code "LAST_WRITE_WINS"}).
  * @param winningEventId   Event chosen as the winner (may be {@code null} while held).
  * @param resolvedAt       Timestamp of resolution (may be {@code null} while held).
  * @param fieldInDispute   Canonical field name that is in conflict.

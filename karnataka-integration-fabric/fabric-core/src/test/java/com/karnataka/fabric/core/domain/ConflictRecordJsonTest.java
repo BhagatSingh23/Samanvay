@@ -31,7 +31,7 @@ class ConflictRecordJsonTest {
                 "UBID-KA-2024-00001",
                 "evt-aaa",
                 "evt-bbb",
-                "LAST_WRITER_WINS",
+                "LAST_WRITE_WINS",
                 "evt-bbb",
                 Instant.parse("2024-07-10T12:00:00Z"),
                 "addressLine1"
@@ -70,7 +70,7 @@ class ConflictRecordJsonTest {
                   "ubid": "UBID-MANUAL",
                   "event1Id": "e1",
                   "event2Id": "e2",
-                  "resolutionPolicy": "MANUAL_REVIEW",
+                  "resolutionPolicy": "HOLD_FOR_REVIEW",
                   "winningEventId": null,
                   "resolvedAt": null,
                   "fieldInDispute": "pincode"
@@ -80,7 +80,7 @@ class ConflictRecordJsonTest {
 
         assertThat(rec.eventId()).isEqualTo("c-42");
         assertThat(rec.ubid()).isEqualTo("UBID-MANUAL");
-        assertThat(rec.resolutionPolicy()).isEqualTo("MANUAL_REVIEW");
+        assertThat(rec.resolutionPolicy()).isEqualTo("HOLD_FOR_REVIEW");
         assertThat(rec.winningEventId()).isNull();
         assertThat(rec.resolvedAt()).isNull();
         assertThat(rec.fieldInDispute()).isEqualTo("pincode");

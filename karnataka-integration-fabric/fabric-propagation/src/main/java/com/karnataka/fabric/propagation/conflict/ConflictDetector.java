@@ -202,30 +202,37 @@ public class ConflictDetector {
      * Loads the conflict resolution policy from the {@code conflict_policies}
      * table for the given service type and field name.
      *
-     * <p>Falls back to {@link ConflictResolutionPolicy#LAST_WRITER_WINS}
+     * <p>Falls back to {@link ConflictResolutionPolicy#LAST_WRITE_WINS}
      * if no specific policy is configured.</p>
      */
     private ConflictResolutionPolicy loadResolutionPolicy(String serviceType, String fieldName) {
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    "SELECT policy FROM conflict_policies WHERE service_type = ? AND field_name = ?",
+                    """
+                    SELECT policy_type FROM conflict_policies
+                    WHERE service_type = ?
+                      AND (field_name = ? OR field_name IS NULL)
+                      AND active = true
+                    ORDER BY field_name NULLS LAST
+                    LIMIT 1
+                    """,
                     serviceType, fieldName);
 
             if (rows.isEmpty()) {
-                log.debug("No conflict policy for serviceType={}, field={} — defaulting to LAST_WRITER_WINS",
+                log.debug("No conflict policy for serviceType={}, field={} — defaulting to LAST_WRITE_WINS",
                         serviceType, fieldName);
-                return ConflictResolutionPolicy.LAST_WRITER_WINS;
+                return ConflictResolutionPolicy.LAST_WRITE_WINS;
             }
 
-            String policyStr = (String) rows.get(0).get("POLICY");
+            String policyStr = (String) rows.get(0).get("policy_type");
             return ConflictResolutionPolicy.valueOf(policyStr);
 
         } catch (IllegalArgumentException e) {
-            log.warn("Unknown conflict policy in DB, defaulting to LAST_WRITER_WINS: {}", e.getMessage());
-            return ConflictResolutionPolicy.LAST_WRITER_WINS;
+            log.warn("Unknown conflict policy in DB, defaulting to LAST_WRITE_WINS: {}", e.getMessage());
+            return ConflictResolutionPolicy.LAST_WRITE_WINS;
         } catch (Exception e) {
             log.warn("Failed to load conflict policy: {}", e.getMessage());
-            return ConflictResolutionPolicy.LAST_WRITER_WINS;
+            return ConflictResolutionPolicy.LAST_WRITE_WINS;
         }
     }
 }

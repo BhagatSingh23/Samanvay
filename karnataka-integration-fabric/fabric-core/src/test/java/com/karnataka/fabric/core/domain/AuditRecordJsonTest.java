@@ -84,7 +84,7 @@ class AuditRecordJsonTest {
                   "targetSystem": "SWS",
                   "auditEventType": "CONFLICT_DETECTED",
                   "timestamp": "2024-08-01T09:00:00Z",
-                  "conflictResolutionPolicy": "LAST_WRITER_WINS",
+                  "conflictResolutionPolicy": "LAST_WRITE_WINS",
                   "supersededByEventId": "evt-newer",
                   "beforeState": { "pin": "560001" },
                   "afterState":  { "pin": "560002" }
@@ -96,7 +96,7 @@ class AuditRecordJsonTest {
         assertThat(rec.eventId()).isEqualTo("evt-z");
         assertThat(rec.ubid()).isEqualTo("UBID-HC");
         assertThat(rec.auditEventType()).isEqualTo(AuditEventType.CONFLICT_DETECTED);
-        assertThat(rec.conflictResolutionPolicy()).isEqualTo("LAST_WRITER_WINS");
+        assertThat(rec.conflictResolutionPolicy()).isEqualTo("LAST_WRITE_WINS");
         assertThat(rec.supersededByEventId()).isEqualTo("evt-newer");
         assertThat(rec.beforeState()).containsEntry("pin", "560001");
         assertThat(rec.afterState()).containsEntry("pin", "560002");
@@ -126,7 +126,7 @@ class AuditRecordJsonTest {
                 "SWS", "DEPT_REV",
                 AuditEventType.CONFLICT_RESOLVED,
                 Instant.now(),
-                "LAST_WRITER_WINS",
+                "LAST_WRITE_WINS",
                 "evt-superseding",
                 Map.of("field", "oldVal"),
                 Map.of("field", "newVal")
@@ -135,7 +135,7 @@ class AuditRecordJsonTest {
         AuditRecord deserialized = mapper.readValue(json, AuditRecord.class);
 
         assertThat(deserialized).isEqualTo(original);
-        assertThat(deserialized.conflictResolutionPolicy()).isEqualTo("LAST_WRITER_WINS");
+        assertThat(deserialized.conflictResolutionPolicy()).isEqualTo("LAST_WRITE_WINS");
         assertThat(deserialized.supersededByEventId()).isEqualTo("evt-superseding");
     }
 }

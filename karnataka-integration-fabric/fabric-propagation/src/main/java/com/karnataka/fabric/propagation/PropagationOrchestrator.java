@@ -230,7 +230,7 @@ public class PropagationOrchestrator {
      *
      * @return {@code true} if the incoming event is the winner and should
      *         proceed to the outbox; {@code false} if the event should be
-     *         held (MANUAL_REVIEW) or is the loser (SUPERSEDED)
+     *         held (HOLD_FOR_REVIEW) or is the loser (SUPERSEDED)
      */
     private boolean handleConflict(CanonicalServiceRequest incomingEvent,
                                     ConflictCheckResult conflict) {
@@ -247,7 +247,7 @@ public class PropagationOrchestrator {
         boolean incomingIsWinner;
 
         switch (policy) {
-            case LAST_WRITER_WINS -> {
+            case LAST_WRITE_WINS -> {
                 // Latest ingestion timestamp wins — incoming is always latest
                 winningEventId = eventId;
                 incomingIsWinner = true;
@@ -262,11 +262,11 @@ public class PropagationOrchestrator {
                     incomingIsWinner = false;
                 }
             }
-            case MANUAL_REVIEW -> {
+            case HOLD_FOR_REVIEW -> {
                 // Hold both events — neither proceeds
                 winningEventId = null;
                 incomingIsWinner = false;
-                log.info("MANUAL_REVIEW: holding eventId={} and {} for conflict on {}",
+                log.info("HOLD_FOR_REVIEW: holding eventId={} and {} for conflict on {}",
                         eventId, conflictingEventId, conflict.fieldInDispute());
             }
             default -> {
