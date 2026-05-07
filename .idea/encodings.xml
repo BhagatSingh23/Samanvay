@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/karnataka-integration-fabric/fabric-adapters/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/karnataka-integration-fabric/fabric-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/karnataka-integration-fabric/fabric-audit/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/karnataka-integration-fabric/fabric-core/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/karnataka-integration-fabric/fabric-propagation/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/karnataka-integration-fabric/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/karnataka-integration-fabric/src/main/resources" charset="UTF-8" />
+  </component>
+</project>
