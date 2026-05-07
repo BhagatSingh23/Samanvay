@@ -1,18 +1,17 @@
 <p align="center">
-  <h1 align="center">🏛️ Karnataka Integration Fabric</h1>
-  <p align="center"><strong>Bidirectional, UBID-Keyed Sync Layer for SWS & Legacy Department Systems</strong></p>
-  <p align="center"><em>An event-driven middleware that keeps Karnataka's Single Window System and 40+ legacy department databases in sync — without modifying either side.</em></p>
+  <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" />
+  <img src="https://img.shields.io/badge/Spring_Boot-3.2.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Apache_Kafka-7.5-231F20?style=for-the-badge&logo=apachekafka&logoColor=white" />
+  <img src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white" />
+  <img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" />
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Java-21-blue?logo=openjdk" />
-  <img src="https://img.shields.io/badge/Spring_Boot-3.2.5-green?logo=springboot" />
-  <img src="https://img.shields.io/badge/Kafka-7.5-black?logo=apachekafka" />
-  <img src="https://img.shields.io/badge/PostgreSQL-16-blue?logo=postgresql" />
-  <img src="https://img.shields.io/badge/Redis-7-red?logo=redis" />
-  <img src="https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs" />
-  <img src="https://img.shields.io/badge/Docker-Compose-blue?logo=docker" />
-</p>
+# Karnataka Integration Fabric
+
+### Bidirectional, UBID-Keyed Sync Layer for SWS and Legacy Department Systems
+
+> **A zero-modification interoperability layer that eliminates split-brain data inconsistency between Karnataka's Single Window System (SWS) and 40+ legacy department systems — using the Unique Business Identifier (UBID) as the universal join key.**
 
 ---
 
@@ -21,15 +20,15 @@
 1. [Problem Statement](#1-problem-statement)
 2. [Solution Overview](#2-solution-overview)
 3. [Architecture](#3-architecture)
-4. [Key Components](#4-key-components)
+4. [Key Components & How They Work](#4-key-components--how-they-work)
 5. [Tech Stack](#5-tech-stack)
 6. [Demo Walkthrough](#6-demo-walkthrough-video-script)
 7. [Edge Cases Handled](#7-edge-cases-handled)
 8. [Conflict Resolution Policy](#8-conflict-resolution-policy)
 9. [Audit Trail Schema](#9-audit-trail-schema)
-10. [How to Run](#10-how-to-run)
-11. [Round 2 Roadmap](#11-round-2-roadmap)
-12. [Team & Submission](#12-team--submission)
+10. [How to Run](#10-how-to-run-the-demo)
+11. [What We Would Build Next](#11-what-we-would-build-next)
+12. [Team & Submission](#12-team--submission-info)
 
 ---
 
@@ -37,568 +36,430 @@
 
 ### The Split-Brain Problem
 
-Karnataka's **Single Window System (SWS)** was built to be the single source of truth for business registrations. In practice, **40+ legacy department systems** (Factories, Shops & Establishments, Revenue, etc.) continue to operate independently. A business can submit the same service request — say, an address change — on *either* system. But **changes made on one system never propagate to the other**.
+Karnataka's Single Window System (SWS) and 40+ legacy department systems (Factories, Shop & Establishments, Revenue, etc.) **run in parallel**. A business registered with UBID `KA-2024-001` can submit an address change in SWS, but the Factories department still shows the old address. Conversely, a signatory update made directly in the Factories portal never reaches SWS.
 
-The result: **split-brain data inconsistency**. SWS says the business is at Address A; the Factories department says Address B. Neither is wrong — they simply never talked to each other.
+The result: **split-brain data inconsistency** — the same business has contradictory records across systems, leading to compliance failures, delayed approvals, and manual reconciliation by thousands of clerical staff.
 
-### Why Big-Bang Migration Won't Work
+### Why Big-Bang Migration Is Not Viable
 
-- Each department system has **independent uptime SLAs**, tech stacks, and governance.
-- Many legacy systems are **decades old** with undocumented schemas.
-- A single cutover would require **simultaneous downtime** across 40+ departments — operationally impossible.
+- **40+ department systems** are independently developed, maintained, and funded — no single authority can mandate a schema change.
+- Many systems are **10–15 year old monoliths** with no REST APIs; some only expose flat-file exports.
+- A phased migration is underway but will take **3–5 years**. Businesses cannot wait.
 
 ### Why UBID Is the Precondition
 
-The **Unique Business Identifier (UBID)** is the *only* field that exists in every system. It is the universal join key that lets us correlate records across SWS and every department database without modifying their schemas.
+The **Unique Business Identifier (UBID)** is the only field guaranteed to exist in both SWS and every legacy department system. It is the **sole join key** that allows us to correlate a record in SWS (`KA-2024-001`) with the same business entity in each department's database. Without UBID, cross-system correlation is impossible.
 
 ---
 
 ## 2. Solution Overview
 
-We built the **Karnataka Integration Fabric** — an event-driven, bidirectional synchronization middleware that sits *between* SWS and department systems as a transparent interoperability layer.
+We built the **Karnataka Integration Fabric** — an event-driven middleware that sits between SWS and every department system **without modifying either side**. It acts as a transparent synchronization layer:
 
-### How It Works (Two Directions)
+```
+SWS  ──webhook──▶  FABRIC  ──API──▶  Dept Systems
+SWS  ◀──API──────  FABRIC  ◀──poll──  Dept Systems
+```
 
-| Direction | Flow |
-|-----------|------|
-| **SWS → Departments** | SWS fires a webhook → Fabric ingests → Kafka → Orchestrator translates schema → Outbox → Dispatch to each department API |
-| **Department → SWS** | Fabric polls department API (or receives webhook) → Detects change → Kafka → Orchestrator translates → Outbox → Dispatch to SWS |
+### The Two Propagation Directions
 
-### Core Guarantees
+| Direction | Trigger | Example |
+|---|---|---|
+| **SWS → Department** | SWS fires a webhook when a business updates its profile | Address change for UBID `KA-2024-001` in SWS → automatically propagated to FACTORIES and SHOP_ESTAB |
+| **Department → SWS** | Fabric polls department APIs for changes (or receives webhooks if available) | Signatory update made directly in the Factories portal → detected by polling → propagated back to SWS |
 
-- ✅ **Zero modifications** to SWS or department systems
-- ✅ **Exactly-once delivery** via SHA-256 fingerprinting + pessimistic locks
-- ✅ **Conflict detection** for simultaneous cross-system updates
-- ✅ **Full audit trail** for every propagation decision
-- ✅ **Resilient delivery** with exponential backoff and dead-letter queue
+### How It Works (The 6-Step Pipeline)
+
+1. **Detect** — Change is detected via webhook, polling, or snapshot-diff
+2. **Normalise** — Raw department payload is normalised into a canonical domain model keyed by UBID
+3. **Translate** — Canonical payload is translated to each target system's schema using versioned, database-driven field mappings with value transforms
+4. **Deduplicate** — SHA-256 fingerprint-based idempotency guard ensures exactly-once delivery
+5. **Conflict Check** — Redis ZSET sliding window detects concurrent mutations of the same UBID; resolution policy is applied (LAST_WRITE_WINS, SOURCE_PRIORITY, or HOLD_FOR_REVIEW)
+6. **Dispatch** — Translated payload is written to a transactional outbox table, then reliably dispatched with exponential backoff (5 attempts, 2s → 32s)
 
 ---
 
 ## 3. Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                        KARNATAKA INTEGRATION FABRIC                      │
-│                                                                          │
-│  ┌─────────┐    ┌──────────────┐    ┌────────────────────────────────┐  │
-│  │   SWS   │───▶│  REST API    │───▶│  Kafka: sws.inbound.events     │  │
-│  │ (Source) │    │  Webhooks    │    └──────────────┬─────────────────┘  │
-│  └─────────┘    └──────────────┘                   │                    │
-│                                                     ▼                    │
-│  ┌─────────┐    ┌──────────────┐    ┌──────────────────────────────┐    │
-│  │  DEPT   │───▶│  Polling /   │───▶│  Kafka: dept.inbound.events  │    │
-│  │ Systems │    │  Webhook /   │    └──────────────┬───────────────┘    │
-│  │         │    │  Snapshot    │                   │                    │
-│  └────▲────┘    └──────────────┘                   ▼                    │
-│       │                              ┌─────────────────────────┐        │
-│       │                              │  PROPAGATION            │        │
-│       │                              │  ORCHESTRATOR           │        │
-│       │                              │                         │        │
-│       │                              │  ┌───────────────────┐  │        │
-│       │                              │  │ Schema Translator  │  │        │
-│       │                              │  │ (MapStruct + DB)   │  │        │
-│       │                              │  └───────────────────┘  │        │
-│       │                              │  ┌───────────────────┐  │        │
-│       │                              │  │ Idempotency Guard  │  │        │
-│       │                              │  │ (SHA-256 + PG Lock)│  │        │
-│       │                              │  └───────────────────┘  │        │
-│       │                              │  ┌───────────────────┐  │        │
-│       │                              │  │ Conflict Detector  │  │        │
-│       │                              │  │ (Redis ZSET)       │  │        │
-│       │                              │  └───────────────────┘  │        │
-│       │                              │  ┌───────────────────┐  │        │
-│       │                              │  │ Audit Service      │  │        │
-│       │                              │  │ (JDBC → PG)        │  │        │
-│       │                              │  └───────────────────┘  │        │
-│       │                              └──────────┬──────────────┘        │
-│       │                                         ▼                       │
-│       │                              ┌─────────────────────┐            │
-│       │                              │ TRANSACTIONAL OUTBOX │            │
-│       │                              │ (PostgreSQL table)   │            │
-│       │                              └──────────┬──────────┘            │
-│       │                                         ▼                       │
-│       │                              ┌─────────────────────┐            │
-│       │                              │   OUTBOX WORKER      │            │
-│       │                              │   (5s polling, exp.  │            │
-│       │                              │    backoff retries)   │            │
-│       │                              └──────────┬──────────┘            │
-│       │                                         ▼                       │
-│       │                              ┌─────────────────────┐            │
-│       │                              │ OUTBOUND DISPATCHER  │            │
-│       │◀─────────────────────────────│ (WebClient +         │            │
-│       │         HTTP POST            │  Circuit Breakers)    │            │
-│       │                              └──────────┬──────────┘            │
-│       │                                         ▼                       │
-│       │                              ┌─────────────────────┐            │
-│       │                              │  DEAD LETTER QUEUE   │            │
-│       │                              │  (after 5 retries)   │            │
-│       │                              └─────────────────────┘            │
-│                                                                          │
-│  ┌──────────────────────────────────────────────────────────────────┐    │
-│  │  NEXT.JS DASHBOARD: Live Feed │ UBID Trace │ Conflicts │ DLQ   │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                     KARNATAKA INTEGRATION FABRIC                     │
+│                                                                      │
+│  ┌─────────────┐    ┌──────────────┐    ┌──────────────────────┐    │
+│  │  Inbound     │    │  Propagation │    │  Outbound Dispatch   │    │
+│  │  Adapters    │───▶│  Orchestrator│───▶│  (Outbox + Worker)   │    │
+│  │             │    │              │    │                      │    │
+│  │ • Webhook   │    │ • Translate  │    │ • SELECT FOR UPDATE  │    │
+│  │ • Polling   │    │ • Idempotency│    │   SKIP LOCKED        │    │
+│  │ • Snapshot  │    │ • Conflict   │    │ • Exponential Backoff│    │
+│  │   Diff      │    │ • Outbox     │    │ • DLQ after 5 fails  │    │
+│  └─────────────┘    └──────────────┘    └──────────────────────┘    │
+│         │                  │                       │                 │
+│         ▼                  ▼                       ▼                 │
+│  ┌─────────────┐    ┌──────────────┐    ┌──────────────────────┐    │
+│  │  Schema      │    │  Conflict    │    │  Audit Trail         │    │
+│  │  Translation │    │  Resolution  │    │  (Immutable Ledger)  │    │
+│  │  Engine      │    │  Engine      │    │                      │    │
+│  │             │    │              │    │ • RECEIVED            │    │
+│  │ • Versioned │    │ • Redis ZSET │    │ • DISPATCHED          │    │
+│  │   Mappings  │    │ • Policies   │    │ • CONFIRMED           │    │
+│  │ • Transforms│    │ • SLA Engine │    │ • SUPERSEDED          │    │
+│  │ • Drift     │    │ • Escalation │    │ • FAILED              │    │
+│  │   Detection │    │ • Auto-Resolve│   │ • CONFLICT_RESOLVED   │    │
+│  └─────────────┘    └──────────────┘    └──────────────────────┘    │
+│         │                  │                       │                 │
+│  ┌──────┴──────────────────┴───────────────────────┴────────────┐   │
+│  │                    PostgreSQL 16 + Redis 7                    │   │
+│  │  event_ledger │ audit_records │ propagation_outbox │ DLQ      │   │
+│  │  conflict_records │ schema_mappings │ idempotency_fingerprints│  │
+│  └──────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────┘
+        ▲                                              │
+        │                                              ▼
+   ┌────┴────┐    ┌──────────┐    ┌──────────┐    ┌────┴────┐
+   │   SWS   │    │ Factories│    │ Shop &   │    │ Revenue │
+   │ (Single │    │ Dept     │    │ Estab    │    │ Dept    │
+   │ Window) │    │ System   │    │ System   │    │ System  │
+   └─────────┘    └──────────┘    └──────────┘    └─────────┘
 ```
 
-### Module Structure
+### Interactive Dashboard
 
-```
-karnataka-integration-fabric/
-├── fabric-core/          # Domain models, enums, Flyway migrations (V1–V11)
-├── fabric-adapters/      # Dept registry, schema translation, polling, webhooks
-├── fabric-propagation/   # Orchestrator, idempotency, conflict, outbox, dispatch
-├── fabric-audit/         # JdbcAuditService → audit_records table
-├── fabric-api/           # REST controllers, Spring Boot main, integration tests
-├── stubs/                # WireMock stubs (SWS, Factories, Shop_Estab, Revenue)
-├── docker-compose.yml    # Full-stack local environment
-└── karnataka-integration-fabric-dashboard-frontend/  # Next.js dashboard
-```
+A **Next.js 16 / React 19** real-time dashboard provides full operational visibility:
+
+| Tab | Purpose |
+|---|---|
+| **Live Event Feed** | Real-time scrolling feed of all events across the fabric |
+| **UBID Trace** | Deep-dive timeline of every touchpoint for a specific business |
+| **Conflict Queue** | HOLD_FOR_REVIEW conflicts with SLA countdown + one-click resolution |
+| **Dead Letter Queue** | Failed events with payload inspection + one-click redispatch |
+| **System Health** | Kafka lag, DB latency, Redis connectivity |
+| **Ask the Fabric** | Natural language queries → instant SQL → audit data (AI-powered) |
+| **Dept Health** | Per-department health grades (A–D) with 7-day sparkline trends |
 
 ---
 
-## 4. Key Components
+## 4. Key Components & How They Work
 
 ### a) Change Detection Engine
 
-| Mode | How It Works | When Used |
-|------|-------------|-----------|
-| **Webhook** | Department POSTs change event to `/api/v1/inbound/{deptId}` | Systems with event capability |
-| **Polling** | `PollingAdapter` calls dept API on schedule with circuit breaker | Systems with query APIs |
-| **Snapshot Diff** | `SnapshotDiffAdapter` hashes full dataset, detects deltas | Systems with no event/query support |
+The fabric supports three ingestion modes per department, configured in JSON:
 
-**Failure handling**: Resilience4j circuit breakers halt polling when a dept is unreachable.
-**Idempotency**: Each detected change is fingerprinted before Kafka publish.
+| Mode | How It Works | Used When |
+|---|---|---|
+| **WEBHOOK** | Department fires HTTP POST to `/api/v1/inbound/{dept}` with payload | System supports event emission |
+| **POLLING** | Fabric polls `GET /changes?since={cursor}` every N seconds | System has a changes endpoint but no push |
+| **SNAPSHOT_DIFF** | Fabric fetches a full snapshot, hashes each record, and detects delta | System has no event capability at all |
+
+**Failure Handling:** Polling cursors are persisted in `poll_cursors` table. If a poll fails, the cursor is not advanced — the next poll retries from the same position. Snapshot hashes are stored in `snapshot_hashes` for diff computation.
+
+**Idempotency:** Every ingested event is fingerprinted with SHA-256 over `(ubid, serviceType, payload, targetDept)`. Duplicate payloads are silently skipped.
 
 ### b) Schema Translation Layer
 
-The `SchemaTranslatorService` loads mapping rules from the `schema_mappings` table and applies field-level transforms via the `TransformEngine`:
+Each department has its own field names and value formats. The fabric uses **database-driven, versioned field mappings** stored in the `schema_mappings` table:
 
-- `UPPERCASE` / `LOWERCASE` — normalize casing
-- `SPLIT_FULLNAME_TO_FIRST_LAST` — split "Rajesh Kumar" → `{first: "Rajesh", last: "Kumar"}`
-- `CONCAT_ADDRESS_LINES` — merge address components
+```json
+{
+  "fields": [
+    { "canonicalField": "registeredAddress.line1", "targetField": "addr_line_1",  "transform": "UPPERCASE" },
+    { "canonicalField": "registeredAddress.pincode", "targetField": "postal_code", "transform": "NONE" },
+    { "canonicalField": "contactPerson", "targetField": "contact_person", "transform": "SPLIT_FULLNAME_TO_FIRST_LAST" }
+  ]
+}
+```
 
-**Schema drift detection**: The `SchemaDriftDetector` compares expected fields against actual API responses and raises `SCHEMA_DRIFT_DETECTED` alerts.
+**Supported Transforms:** `NONE`, `UPPERCASE`, `LOWERCASE`, `DATE_ISO_TO_EPOCH`, `DATE_EPOCH_TO_ISO`, `SPLIT_FULLNAME_TO_FIRST_LAST`, `CONCAT_ADDRESS_LINES`
 
-### c) Bidirectional Event Router (`PropagationOrchestrator`)
+**Bidirectional:** The same mapping powers both forward (canonical → department) and reverse (department → canonical) translation. Mappings are cached for 60s via Caffeine. A **Drift Detection Engine** monitors for schema changes and raises alerts when a department's payload no longer matches the mapping.
 
-The central orchestrator executes a 5-step pipeline for every event:
+### c) Bidirectional Event Router (PropagationOrchestrator)
 
-1. **Resolve targets** — SWS events → all departments; Dept events → SWS + other depts
-2. **Translate** — canonical → department-specific schema
-3. **Idempotency check** — SHA-256 fingerprint with `SELECT FOR UPDATE` lock
-4. **Conflict detection** — Redis ZSET sliding window check
-5. **Enqueue to outbox** — transactional insert for reliable delivery
+The central nervous system of the fabric. For each incoming event:
+
+1. Resolves target departments by excluding the source system
+2. Translates the payload for each target using versioned mappings
+3. Acquires an idempotency lock
+4. Runs conflict detection against the Redis sliding window
+5. If no conflict (or conflict resolved in favour of this event): inserts into `propagation_outbox`
+6. The `OutboxWorker` picks up pending rows using `SELECT FOR UPDATE SKIP LOCKED` and dispatches via `WebClient` with Resilience4j circuit breakers
 
 ### d) Conflict Detection & Resolution Engine
 
-**Detection** (Redis ZSET):
-```
-Key:   ubid_window:{UBID}:{serviceType}
-Score: ingestionTimestamp (epochMillis)
-Value: eventId
-TTL:   conflictWindowSeconds (default: 30s, demo: 60s)
-```
+**Detection:** A Redis Sorted Set (ZSET) keyed by UBID stores event timestamps. When a new event arrives, the engine queries the window (default: 60 seconds) for any concurrent mutations from a *different* source system.
 
-If `ZRANGEBYSCORE` returns >1 event → conflict detected. The engine then:
-1. Loads both payloads from `event_ledger`
-2. Compares fields to identify the dispute (e.g., `registeredAddress.line1`)
-3. Loads resolution policy from `conflict_policies` table
-4. Applies policy and marks loser as `SUPERSEDED`
+**Resolution Policies** (configurable per `service_type × dept_id × field_name`):
+
+| Policy | Behaviour |
+|---|---|
+| `LAST_WRITE_WINS` | Latest `ingestion_timestamp` wins; loser is marked `SUPERSEDED` |
+| `SOURCE_PRIORITY` | Configured priority source always wins (e.g., SWS for address changes) |
+| `HOLD_FOR_REVIEW` | Both events are parked; operator resolves manually via dashboard |
+
+**SLA Escalation Engine:** HOLD_FOR_REVIEW conflicts are tracked with a configurable SLA (default: 4 hours). Level 1 breach sends a dashboard notification + optional webhook. Level 2 breach auto-resolves using the fallback policy. Everything is logged in the immutable audit trail.
 
 ### e) Audit Trail Store
 
-Every event lifecycle state is captured in `audit_records`:
+Every state transition produces an immutable `audit_records` row:
 
-`RECEIVED` → `TRANSLATED` → `DISPATCHED` → `CONFIRMED` (or `FAILED` → `RETRY_QUEUED` → `DLQ_PARKED`)
+| Field | Description |
+|---|---|
+| `event_id` | Which event triggered this audit entry |
+| `ubid` | The business affected |
+| `source_system` | Where the change originated |
+| `target_system` | Where it was propagated to |
+| `audit_event_type` | `RECEIVED`, `DISPATCHED`, `CONFIRMED`, `SUPERSEDED`, `CONFLICT_RESOLVED`, `FAILED` |
+| `conflict_policy` | If a conflict was resolved, which policy was applied |
+| `superseded_by` | If this event lost a conflict, which event won |
+| `before_state` / `after_state` | Full JSONB snapshots for forensic analysis |
 
-Side branches: `CONFLICT_DETECTED` → `CONFLICT_RESOLVED` | `SCHEMA_DRIFT_DETECTED`
+**Natural Language Querying:** Operators can ask questions in plain English (e.g., *"Show me all conflicts for FACTORIES last week"*) and the AI-powered `NaturalLanguageQueryService` translates the query to SQL, executes it safely, and returns structured results.
 
 ### f) Idempotency & Retry Manager
 
-**Idempotency**: SHA-256 of `(UBID + serviceType + sortedPayloadJSON + targetDeptId)`. Stored in `idempotency_fingerprints` with pessimistic locking. Stale locks (>5 min) are automatically reclaimed.
-
-**Retry (Outbox Worker)**:
-
-| Attempt | Backoff | Action |
-|---------|---------|--------|
-| 1 | 30 seconds | Retry |
-| 2 | 2 minutes | Retry |
-| 3 | 10 minutes | Retry |
-| 4 | 1 hour | Retry |
-| 5 | — | Move to Dead Letter Queue |
+| Mechanism | Implementation |
+|---|---|
+| **Deduplication** | SHA-256 fingerprint over `(ubid, serviceType, payload, targetDept)` stored in `idempotency_fingerprints` table. INSERT ON CONFLICT + SELECT FOR UPDATE provides race-safe locking. |
+| **Outbox Pattern** | Events are written to `propagation_outbox` inside the same DB transaction as the ledger update. `OutboxWorker` polls every 2s with `SELECT FOR UPDATE SKIP LOCKED`. |
+| **Exponential Backoff** | Failed dispatches retry 5 times: 2s → 4s → 8s → 16s → 32s. |
+| **Dead Letter Queue** | After 5 failures, the event is parked in `dead_letter_queue` with the failure reason. Operators can inspect and manually redispatch. |
+| **Circuit Breaker** | Resilience4j circuit breaker wraps all outbound WebClient calls to prevent cascade failures when a department API is down. |
 
 ---
 
 ## 5. Tech Stack
 
-| Technology | Version | Why This Choice |
-|-----------|---------|----------------|
-| **Java** | 21 | Virtual threads, pattern matching, text blocks for SQL |
-| **Spring Boot** | 3.2.5 | Enterprise-grade DI, Kafka/JPA/WebFlux/Actuator integration |
-| **PostgreSQL** | 16 | JSONB for flexible payloads, `SELECT FOR UPDATE SKIP LOCKED` for outbox |
-| **Apache Kafka** | Confluent 7.5 | Decouples ingestion from processing; handles burst traffic |
-| **Redis** | 7 Alpine | Sub-ms ZSET operations for conflict window detection |
-| **Resilience4j** | 2.2 | Per-department circuit breakers prevent cascade failures |
-| **Flyway** | 10.11 | Versioned, repeatable DB migrations (V1–V11) |
-| **WireMock** | 3.5.4 | Mock SWS + 3 department APIs for sandbox demo |
-| **Next.js + React** | 16 / 19 | Real-time dashboard with SWR polling |
-| **Docker Compose** | 3.9 | One-command full-stack deployment |
-| **MapStruct** | 1.5.5 | Compile-time schema mapping code generation |
-| **Lombok** | 1.18 | Reduce boilerplate in domain models |
+| Technology | Version | Why We Chose It |
+|---|---|---|
+| **Java 21** | LTS | Virtual threads, pattern matching, text blocks — ideal for high-throughput event processing |
+| **Spring Boot** | 3.2.5 | Production-grade framework with first-class support for Kafka, JDBC, WebFlux, and scheduling |
+| **PostgreSQL** | 16 | JSONB for schema-flexible payloads, `gen_random_uuid()` for primary keys, `SELECT FOR UPDATE SKIP LOCKED` for concurrent outbox workers |
+| **Apache Kafka** | Confluent 7.5 | Durable, ordered event backbone for inter-module communication; 6-partition topics for parallelism |
+| **Redis** | 7 | ZSET-based conflict detection windows (O(log N) range queries); health score caching with TTL |
+| **Flyway** | 10.11 | 14 versioned migrations ensure reproducible schema across dev/staging/prod |
+| **Resilience4j** | 2.2 | Circuit breakers + retry decorators for all outbound HTTP calls |
+| **MapStruct** | 1.5.5 | Compile-time mapping between DTOs — zero reflection overhead |
+| **Next.js** | 16 | Server-side rendering for SEO + React 19 for interactive dashboard components |
+| **Docker Compose** | — | One-command local deployment of 9 containers (Postgres, Redis, ZooKeeper, Kafka, API, Dashboard, 3× WireMock stubs) |
+| **WireMock** | 3.5 | Simulates SWS, Factories, and Shop & Establishments APIs for reproducible demos |
 
 ---
 
 ## 6. Demo Walkthrough (Video Script)
 
-> This section serves as the **exact script** for the demo video. Each scenario maps to pre-seeded data.
+### Scene 1 — SWS → Department Propagation (Happy Path)
 
-### 🎬 Setup (30 seconds)
+> *"A business with UBID `KA-2024-001` updates its registered address in SWS."*
 
-```bash
-make demo    # Builds, starts all containers, seeds demo data
-```
+1. **Trigger:** Send `POST /api/v1/inbound/sws` with an ADDRESS_CHANGE payload containing the new address for UBID `KA-2024-001`.
+2. **Live Feed:** Watch the event appear as `RECEIVED` in the Live Event Feed tab (green badge).
+3. **Orchestration:** The PropagationOrchestrator resolves two targets: FACTORIES and SHOP_ESTAB. It translates the canonical payload using versioned mappings — `registeredAddress.line1` becomes `addr_line_1` (UPPERCASE) for Factories, and `shop_addr_1` for Shop & Estab.
+4. **Idempotency:** SHA-256 fingerprint is computed; first time → lock acquired.
+5. **Dispatch:** Two outbox rows are created. The OutboxWorker dispatches both. Events transition to `DISPATCHED` then `CONFIRMED` in the feed.
+6. **Audit:** Open UBID Trace → paste `KA-2024-001` → see the complete timeline: RECEIVED → DISPATCHED (FACTORIES) → CONFIRMED → DISPATCHED (SHOP_ESTAB) → CONFIRMED.
 
-Open the **Dashboard** at `http://localhost:3000`. Show the 5 tabs: Live Event Feed, UBID Trace, Conflict Queue, Dead Letter Queue, System Health.
+### Scene 2 — Department → SWS Propagation (Polling)
 
----
+> *"The same business has its authorised signatory updated directly inside the Factories system."*
 
-### 🎬 Scenario 1 — SWS → Department Propagation
+1. **Detection:** The Factories adapter is configured in POLLING mode. It detects a SIGNATORY_UPDATE for UBID `KA-2024-002`.
+2. **Reverse Translation:** The department-specific payload is translated back to canonical format using the same mapping rules in reverse.
+3. **Propagation:** The orchestrator identifies SWS as the target and dispatches the translated payload.
+4. **Verification:** Open UBID Trace → `KA-2024-002` → see the reverse flow from FACTORIES → SWS with full audit trail.
 
-**UBID**: `KA-2024-001` (Karnataka Steel Works Pvt Ltd)
+### Scene 3 — Conflict Resolution
 
-> *"A business updates its registered address on the SWS portal from '42 MG Road' to '100 Electronic City'. Let's see how the Integration Fabric detects, translates, and propagates this change to the Factories and Shops & Establishments departments."*
+> *"Two updates for the same UBID arrive nearly simultaneously — one from SWS, one from Factories."*
 
-**Step 1**: Fire the SWS webhook:
-```bash
-curl -X POST http://localhost:8080/api/v1/inbound/sws \
-  -H "Content-Type: application/json" \
-  -d '{
-    "eventId": "'$(uuidgen)'",
-    "ubid": "KA-2024-001",
-    "sourceSystemId": "SWS",
-    "serviceType": "ADDRESS_CHANGE",
-    "payload": {
-      "registeredAddress": {
-        "line1": "100 Electronic City Phase 1",
-        "city": "Bengaluru",
-        "pincode": "560100",
-        "state": "Karnataka"
-      },
-      "businessName": "Karnataka Steel Works Pvt Ltd"
-    }
-  }'
-```
+1. **Setup:** Two events for UBID `KA-2024-003` are seeded — one from SWS, one from FACTORIES, both within the 60-second conflict window.
+2. **Detection:** The ConflictDetector's Redis ZSET query finds both events. A `conflict_records` row is created.
+3. **Resolution:** The conflict policy for ADDRESS_CHANGE is `SOURCE_PRIORITY` with `priority_source = SWS`. The SWS event wins; the Factories event is marked `SUPERSEDED`.
+4. **Dashboard:** Open Conflict Queue tab → see the resolved conflict with full explanation: *"SOURCE_PRIORITY: SWS wins over FACTORIES for ADDRESS_CHANGE"*.
+5. **Audit:** The audit trail shows `CONFLICT_RESOLVED` with `conflict_policy = SOURCE_PRIORITY` and `superseded_by = {SWS event ID}`.
 
-**Step 2**: Switch to the **UBID Trace** tab. Search for `KA-2024-001`. Show the audit trail:
-- `RECEIVED` — event ingested from SWS
-- `DISPATCHED` → FACTORIES — translated payload sent
-- `DISPATCHED` → SHOP_ESTAB — translated payload sent
-- `CONFIRMED` — both departments acknowledged
+### Scene 4 — Dead Letter Queue & Recovery
 
-**Step 3**: Show the **translated payload** difference:
-- SWS uses `registeredAddress.line1`
-- Factories expects `addr_line_1` (UPPERCASE transform applied)
-- Shop_Estab expects `shop_address_line1`
+> *"The Factories API returns 503 Service Unavailable."*
 
-> *"The schema translation happened automatically using mapping rules stored in PostgreSQL. No code change needed to add a new department — just insert new mapping rules."*
+1. **Failure:** An event for UBID `KA-2024-004` is dispatched to FACTORIES, but the mock returns 503.
+2. **Retry:** The OutboxWorker retries with exponential backoff: 2s → 4s → 8s → 16s → 32s. All 5 attempts fail.
+3. **DLQ:** The event is parked in the Dead Letter Queue with failure reason `503 Service Unavailable`.
+4. **Dashboard:** Open DLQ tab → inspect the full JSON payload → click **Redispatch** → the event is re-queued and (once the mock is back) successfully delivered.
 
----
+### Scene 5 — Natural Language Audit Query
 
-### 🎬 Scenario 2 — Department → SWS Propagation
+> *"An operator asks: Show me all conflicts for the FACTORIES department."*
 
-**UBID**: `KA-2024-002` (Mysore Silks International)
+1. **Query:** Open the "Ask the Fabric" tab → type the question in plain English.
+2. **AI Translation:** The NaturalLanguageQueryService sends the question to the LLM, which generates safe, read-only SQL.
+3. **Results:** The audit data is returned in a formatted table with conflict IDs, policies applied, and timestamps.
 
-> *"This business updated its Authorized Signatory directly inside the Factories legacy portal. The Fabric's polling adapter detected this change and will propagate it back to SWS."*
+### Scene 6 — Department Health Scoreboard
 
-**Step 1**: Show the pre-seeded event in the **Live Event Feed** tab — a `SIGNATORY_UPDATE` from `DEPT_FACTORIES`.
+> *"Which departments are degrading?"*
 
-**Step 2**: Show the **UBID Trace** for `KA-2024-002`:
-- `RECEIVED` from `DEPT_FACTORIES`
-- Event normalized into canonical format
-- Dispatched to SWS and SHOP_ESTAB (fan-out to other systems)
-
-> *"The polling adapter uses a cursor stored in `poll_cursors` to avoid re-processing. If the Factories API goes down, the circuit breaker trips and retries later."*
-
----
-
-### 🎬 Scenario 3 — Conflict Resolution
-
-**UBID**: `KA-2024-003` (Deccan Enterprises)
-
-> *"Two conflicting address updates arrived within 2 seconds of each other — one from SWS saying '88 Brigade Road', and one from Factories saying '99 Commercial Street'. Watch how the conflict detector catches this."*
-
-**Step 1**: Open the **Conflict Queue** tab. Show the unresolved conflict:
-- Event 1: SWS → `88 Brigade Road`
-- Event 2: DEPT_FACTORIES → `99 Commercial Street`
-- Field in dispute: `registeredAddress.line1`
-- Policy: `SOURCE_PRIORITY`
-
-**Step 2**: Resolve the conflict (SWS wins):
-```bash
-curl -X POST http://localhost:8080/api/v1/conflicts/{conflictId}/resolve \
-  -H "Content-Type: application/json" \
-  -d '{"winningEventId": "<sws-event-id>"}'
-```
-
-**Step 3**: Show the **audit trail** for `KA-2024-003`:
-- `CONFLICT_DETECTED` — field: `registeredAddress.line1`, policy: `SOURCE_PRIORITY`
-- `CONFLICT_RESOLVED` — winner: SWS event
-- Factories event marked `SUPERSEDED`
-
-> *"The conflict policy is configurable per service type and field. SWS is authoritative for address changes, but for factory-specific fields like inspection dates, we could configure LAST_WRITE_WINS or HOLD_FOR_REVIEW."*
-
----
-
-### 🎬 Scenario 4 — Resilience & Dead Letter Queue
-
-**UBID**: `KA-2024-004` (Mysore Silks International)
-
-> *"The Factories API returned HTTP 503 five times in a row. Watch how the system retried with exponential backoff and eventually parked the event in the Dead Letter Queue."*
-
-**Step 1**: Open the **Dead Letter Queue** tab. Show the parked event:
-- UBID: `KA-2024-004`
-- Target: `FACTORIES`
-- Failure: `HTTP 503 Service Unavailable`
-- Attempts: 5/5
-
-**Step 2**: Show the **audit trail**: `RECEIVED` → `FAILED` → `DLQ_PARKED`
-
-> *"An operator can manually retry from the DLQ once the Factories system is back online. The circuit breaker prevents further calls until the system recovers."*
+1. **Dashboard:** Open the "Dept Health" tab.
+2. **Grades:** See real-time health grades: FACTORIES = A (92/100), SHOP_ESTAB = B (76/100), REVENUE = D (54/100).
+3. **Sparklines:** 7-day trend charts show REVENUE has been declining from C → D.
+4. **Alerts:** The "Departments Needing Attention" panel flags REVENUE with *"3 events stuck in Dead Letter Queue"* — click to jump directly to the DLQ tab.
 
 ---
 
 ## 7. Edge Cases Handled
 
 | Edge Case | How We Handle It |
-|-----------|-----------------|
-| **Duplicate requests** | SHA-256 fingerprint + `SELECT FOR UPDATE` pessimistic lock in `idempotency_fingerprints` table. Stale locks (>5 min) auto-reclaimed. |
-| **Department system down** | Transactional outbox with exponential backoff: 30s → 2m → 10m → 1h → DLQ. Per-department Resilience4j circuit breakers. |
-| **Schema mismatch** | `SchemaTranslatorService` returns `TranslationResult` with warnings. Unmappable fields logged, pipeline continues. `SchemaDriftDetector` raises alerts. |
-| **Simultaneous conflicting updates** | Redis ZSET sliding window (configurable: 30–60s). Policy lookup from `conflict_policies` table. Loser marked `SUPERSEDED`. |
-| **No native event emission** | `PollingAdapter` (scheduled, cursor-based) and `SnapshotDiffAdapter` (hash-based delta detection). |
-| **UBID not found in target** | Event parked in `pending_ubid_resolution` table for later reconciliation. |
-| **Partial propagation failure** | Outbox tracks entries **per target**. Factories failing does not block Shop_Estab delivery. |
-| **Network partition during write** | Outbox pattern: event persisted to DB *before* HTTP dispatch. Crash recovery picks up `PENDING` entries. |
-| **Kafka consumer restart** | `auto-offset-reset: earliest` ensures no events are lost on consumer group rebalance. |
+|---|---|
+| **Duplicate requests** | SHA-256 fingerprint deduplication with `INSERT ON CONFLICT` — duplicate payloads return `DUPLICATE_SKIP` |
+| **Department temporarily down** | Exponential backoff retry (5 attempts, 2s → 32s), then park in DLQ for manual redispatch |
+| **Schema mismatch** | Translation engine emits warnings for missing fields; partial payloads are still dispatched. Drift Detection alerts operators to schema changes. |
+| **Conflicting simultaneous updates** | Redis ZSET sliding window detects concurrent mutations; configurable policy resolves automatically or holds for manual review |
+| **No native event emission** | POLLING mode polls `GET /changes?since={cursor}`; SNAPSHOT_DIFF mode hashes full snapshot and computes delta |
+| **UBID not found** | `pending_ubid_resolution` table holds events until the UBID is resolvable |
+| **Partial propagation failure** | Each target is independent. If FACTORIES succeeds and SHOP_ESTAB fails, the SHOP_ESTAB entry retries independently while FACTORIES is confirmed |
+| **Network partition during write** | Transactional outbox pattern: the event is committed to `propagation_outbox` in the same DB transaction as the ledger update. If the process crashes, OutboxWorker picks it up on restart. |
+| **Idempotency race condition** | `SELECT FOR UPDATE` on the fingerprint row prevents two workers from processing the same event concurrently |
+| **SLA breach on held conflicts** | Two-level escalation: L1 = notification at SLA deadline; L2 = automatic resolution using fallback policy after extension period |
 
 ---
 
 ## 8. Conflict Resolution Policy
 
-### Detection Mechanism
+### How Conflicts Are Detected
 
-```
-Window:  configurable (default 30s, demo 60s)
-Trigger: 2+ events for same (UBID, serviceType) within window
-Storage: Redis ZSET with TTL-based auto-cleanup
-```
+The `ConflictDetector` uses a **Redis Sorted Set (ZSET)** keyed by UBID. When a new event arrives:
+
+1. Add the event to `conflict:window:{ubid}` with the ingestion timestamp as score
+2. Query the ZSET for all events within the last 60 seconds
+3. If any event in the window is from a **different source system**, flag as conflict
 
 ### Resolution Strategies
 
-| Strategy | Behavior | Use Case |
-|----------|----------|----------|
-| `LAST_WRITE_WINS` | Latest ingestion timestamp wins | Low-risk fields (e.g., contact phone) |
-| `SOURCE_PRIORITY` | SWS always wins over department systems | Authoritative fields (e.g., registered address) |
-| `HOLD_FOR_REVIEW` | Both events paused in `CONFLICT_HELD` state | High-risk fields requiring human judgment |
+| Policy | Behaviour | Use Case |
+|---|---|---|
+| `LAST_WRITE_WINS` | Latest `ingestion_timestamp` wins | Default fallback when no specific policy is configured |
+| `SOURCE_PRIORITY` | Configured `priority_source` always wins | ADDRESS_CHANGE → SWS is authoritative; SIGNATORY_UPDATE → FACTORIES is authoritative |
+| `HOLD_FOR_REVIEW` | Both events parked in `conflict_hold_queue`; neither propagated until an operator resolves | OWNERSHIP_CHANGE — too sensitive for automatic resolution |
 
-### Audit Logging
+### How the Decision Is Logged
 
-Every conflict produces an immutable record in `conflict_records`:
-
-```sql
-conflict_id       UUID PRIMARY KEY
-ubid              TEXT           -- the business entity
-event1_id         UUID           -- first event in window
-event2_id         UUID           -- second event in window
-resolution_policy TEXT           -- LAST_WRITE_WINS | SOURCE_PRIORITY | HOLD_FOR_REVIEW
-winning_event_id  UUID           -- NULL if HOLD_FOR_REVIEW
-field_in_dispute  TEXT           -- e.g., "registeredAddress.line1"
-resolved_at       TIMESTAMPTZ
-```
+Every conflict resolution produces an `audit_records` entry with:
+- `audit_event_type = 'CONFLICT_RESOLVED'`
+- `conflict_policy = 'SOURCE_PRIORITY'` (or whichever policy was applied)
+- `superseded_by = {winning event UUID}`
+- `before_state` / `after_state` = full JSONB snapshots
 
 ---
 
 ## 9. Audit Trail Schema
 
-### Database Table: `audit_records`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `audit_id` | UUID | Primary key |
-| `event_id` | UUID | The event being tracked |
-| `ubid` | TEXT | Business identifier |
-| `source_system` | TEXT | Origin (SWS, DEPT_FACTORIES, etc.) |
-| `target_system` | TEXT | Destination (nullable for ingestion events) |
-| `audit_event_type` | TEXT | RECEIVED, DISPATCHED, CONFIRMED, FAILED, CONFLICT_DETECTED, DLQ_PARKED |
-| `ts` | TIMESTAMPTZ | When this audit entry was created |
-| `before_state` | JSONB | State before the change |
-| `after_state` | JSONB | State after the change / resolution details |
-
-### Sample Entry — Conflict Resolution
+### Sample Audit Log Entry
 
 ```json
 {
-  "auditId": "8f7a4b2c-...",
-  "eventId": "e99b11a2-...",
+  "audit_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "event_id": "11111111-2222-3333-4444-555555555555",
   "ubid": "KA-2024-003",
-  "sourceSystem": "SWS",
-  "targetSystem": null,
-  "auditEventType": "CONFLICT_DETECTED",
-  "ts": "2026-05-07T12:05:00Z",
-  "beforeState": {
-    "conflictingEventId": "a1b233c4-...",
-    "fieldInDispute": "registeredAddress.line1"
+  "source_system": "SWS",
+  "target_system": "FACTORIES",
+  "audit_event_type": "CONFLICT_RESOLVED",
+  "ts": "2026-05-07T14:30:00Z",
+  "conflict_policy": "SOURCE_PRIORITY",
+  "superseded_by": "66666666-7777-8888-9999-000000000000",
+  "before_state": {
+    "registeredAddress": {
+      "line1": "100 MG Road",
+      "city": "Bengaluru"
+    }
   },
-  "afterState": {
-    "policy": "SOURCE_PRIORITY",
-    "winningEventId": "e99b11a2-..."
+  "after_state": {
+    "registeredAddress": {
+      "line1": "200 Brigade Road",
+      "city": "Bengaluru"
+    }
   }
 }
 ```
 
-### Sample Entry — Successful Delivery
-
-```json
-{
-  "auditId": "cc91a3f1-...",
-  "eventId": "d44e7b89-...",
-  "ubid": "KA-2024-001",
-  "sourceSystem": "FABRIC",
-  "targetSystem": "FACTORIES",
-  "auditEventType": "CONFIRMED",
-  "ts": "2026-05-07T12:03:15Z",
-  "beforeState": null,
-  "afterState": {
-    "status": "DELIVERED",
-    "attemptCount": 1
-  }
-}
-```
+This entry tells you: *The SWS event won the conflict because the SOURCE_PRIORITY policy designates SWS as authoritative for ADDRESS_CHANGE. The Factories event (superseded_by) was marked SUPERSEDED. The business address changed from MG Road to Brigade Road.*
 
 ---
 
-## 10. How to Run
+## 10. How to Run the Demo
 
 ### Prerequisites
 
-- Docker Desktop (with Docker Compose)
-- Make (optional, for convenience commands)
-- 8 GB+ RAM allocated to Docker
+- **Docker Desktop** (with Docker Compose v2)
+- **Make** (pre-installed on macOS/Linux)
+- ~4 GB free RAM for the 9-container stack
 
-### One-Command Demo
+### One-Command Launch
 
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd karnataka-integration-fabric
+cd karnataka-integration-fabric-backend
 
-# Start everything: Postgres, Redis, Kafka, WireMock stubs, Backend API, Next.js Dashboard
+# Build + start everything + seed demo data
 make demo
 ```
 
-This single command:
-1. Builds the Java multi-module project
-2. Starts all infrastructure containers
-3. Waits for health checks to pass
-4. Seeds 50 synthetic businesses and 4 demo scenarios
-5. Opens the dashboard at `http://localhost:3000`
+This single command will:
+1. Build the Spring Boot JAR (multi-stage Docker build with JDK 21)
+2. Build the Next.js dashboard (standalone mode)
+3. Start 9 containers: PostgreSQL, Redis, ZooKeeper, Kafka, Fabric API, Dashboard, and 3 WireMock stubs (SWS, Factories, Shop & Estab)
+4. Wait for the API health check to pass
+5. Seed 50 synthetic businesses + 4 demo scenarios via `POST /api/v1/demo/reset`
 
 ### Access Points
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| **Dashboard** | http://localhost:3000 | Real-time observability UI |
-| **Fabric API** | http://localhost:8080 | REST endpoints |
-| **Mock SWS** | http://localhost:8081 | WireMock stub for SWS |
-| **Mock Factories** | http://localhost:8082 | WireMock stub |
-| **Mock Shop_Estab** | http://localhost:8083 | WireMock stub |
-| **Mock Revenue** | http://localhost:8084 | WireMock stub |
+| Service | URL |
+|---|---|
+| **Dashboard** | http://localhost:3000 |
+| **Fabric API** | http://localhost:8080 |
+| **Mock SWS** | http://localhost:8081 |
+| **Mock Factories** | http://localhost:8082 |
+| **Mock Shop & Estab** | http://localhost:8083 |
 
-### Key API Endpoints
+### Quick Reset (Between Demos)
 
 ```bash
-# Ingest SWS event
-POST /api/v1/inbound/sws
-
-# Ingest department webhook
-POST /api/v1/inbound/{deptId}
-
-# Dry-run translation (preview without dispatching)
-POST /api/v1/translate/dry-run
-
-# View events by UBID
-GET  /api/v1/events?ubid=KA-2024-001
-
-# View/manage schema mappings
-GET  /api/v1/mappings
-POST /api/v1/mappings
-
-# View drift alerts
-GET  /api/v1/drift-alerts
-
-# Health check
-GET  /api/v1/health
-
-# Reset demo data
-POST /api/v1/demo/reset
+make demo-reset    # Wipes all data + re-seeds in ~2 seconds
 ```
 
-### Other Commands
+### Tear Down
 
 ```bash
-make docker-down    # Tear down all containers and volumes
-make demo-reset     # Reset demo data without restarting
-make test           # Run full test suite (H2 in-memory, no Docker needed)
-make build          # Build all modules (skip tests)
+make docker-down   # Stops all containers, removes volumes
 ```
 
 ---
 
-## 11. Round 2 Roadmap
+## 11. What We Would Build Next
+
+### Round 2 Enhancements
 
 | Feature | Description |
-|---------|-------------|
-| **UBID Registry Lookup** | Query a central registry to discover which departments a UBID is registered with (vs. current broadcast-to-all approach) |
-| **Interactive Conflict Resolution UI** | Dashboard panel for admins to manually resolve `HOLD_FOR_REVIEW` conflicts |
-| **DLQ Management Endpoints** | `GET /api/v1/dlq`, `POST /api/v1/dlq/{id}/retry`, `POST /api/v1/dlq/{id}/resolve` |
-| **Batch Event Ingestion** | `POST /api/v1/inbound/sws/batch` for high-throughput initial data loads |
-| **Revenue Department Adapter** | Add mapping rules for the Revenue system (config exists, mappings TBD) |
-| **Prometheus Metrics** | Micrometer counters for events ingested/propagated/conflicted/DLQ'd via `/actuator/prometheus` |
-| **Gatling Load Tests** | Validate throughput limits on Kafka consumers and outbox processing |
-| **Outbox Monitoring Dashboard** | Real-time visualization of outbox queue depth and processing latency |
+|---|---|
+| **Sandbox Environment** | Full sandbox with mock SWS and department endpoints that accept and return realistic payloads |
+| **Additional Adapters** | Revenue, BBMP, Transport department adapters with department-specific schema mappings |
+| **UBID Resolution Service** | Integration with the UBID registry for real-time UBID validation and cross-referencing |
+| **Performance Benchmarks** | Load testing with 10,000 concurrent events; publish throughput and P99 latency numbers |
+| **Multi-Tenant** | Support for multiple states using the same fabric with isolated configurations |
+| **Compliance Reports** | Automated weekly reports showing sync completeness per department |
+| **Mobile Notifications** | Push notifications to department officers when HOLD_FOR_REVIEW conflicts need attention |
 
 ---
 
-## 12. Team & Submission
+## 12. Team & Submission Info
 
 | | |
 |---|---|
-| **Hackathon** | Two-Way Interoperability — Karnataka Commerce & Industry |
-| **Theme** | SWS ↔ Legacy Department System Interoperability |
+| **Hackathon** | Karnataka Commerce & Industry — Two-Way Interoperability Challenge |
 | **Team Name** | Samanvay |
-| **Project** | Karnataka Integration Fabric |
-
----
-
-## Database Schema (12 Tables)
-
-| Table | Purpose |
-|-------|---------|
-| `event_ledger` | Master event store (UBID, payload as JSONB, status) |
-| `audit_records` | Immutable audit trail for every state transition |
-| `conflict_records` | Detected conflicts with resolution details |
-| `conflict_policies` | Configurable per-service-type resolution policies |
-| `conflict_hold_queue` | Events held for manual review |
-| `propagation_outbox` | Transactional outbox for reliable delivery |
-| `dead_letter_queue` | Failed events after retry exhaustion |
-| `idempotency_fingerprints` | SHA-256 locks for exactly-once processing |
-| `schema_mappings` | Dynamic field mapping rules per department |
-| `drift_alerts` | Schema drift detection results |
-| `poll_cursors` | Polling watermarks per department |
-| `snapshot_hashes` | Hash-based change detection for snapshot diff |
+| **Project** | Karnataka Integration Fabric — Bidirectional UBID-Keyed Sync Layer |
 
 ---
 
 <p align="center">
-  <strong>Built with ❤️ for Karnataka's digital governance infrastructure</strong>
+  <em>Built with ☕ and conviction that interoperability shouldn't require rewriting legacy systems.</em>
 </p>
