@@ -97,7 +97,7 @@ public class SchemaDriftDetector {
     /**
      * Detects drift for a single department. Package-private for testing.
      */
-    void detectDriftForDept(DepartmentConfig config) {
+    public void detectDriftForDept(DepartmentConfig config) {
         String sampleUrl = getSampleUrl(config);
         if (sampleUrl == null) {
             log.debug("No sample URL for dept={}, skipping drift check", config.deptId());
