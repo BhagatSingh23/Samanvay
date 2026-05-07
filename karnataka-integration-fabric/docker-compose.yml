@@ -35,7 +35,6 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    # internal only — no host port mapping
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -71,6 +70,7 @@ services:
     ports:
       - "8080:8080"
     environment:
+      SPRING_PROFILES_ACTIVE: demo
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fabric_db
       SPRING_DATASOURCE_USERNAME: fabric
       SPRING_DATASOURCE_PASSWORD: fabric
@@ -83,6 +83,27 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ── Dashboard (Next.js) ───────────────────────────────────────
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: fabric-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://fabric-api:8080
+    depends_on:
+      fabric-api:
+        condition: service_healthy
 
   # ── Mock External Systems (WireMock) ──────────────────────────
 

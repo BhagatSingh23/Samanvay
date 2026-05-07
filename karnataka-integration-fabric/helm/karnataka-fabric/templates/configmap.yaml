@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-fabric-config
+  labels:
+    app.kubernetes.io/name: fabric-api
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  application.yml: |
+    server:
+      port: {{ .Values.fabricApi.port }}
+
+    spring:
+      application:
+        name: karnataka-integration-fabric
+
+      datasource:
+        url: jdbc:postgresql://{{ .Release.Name }}-postgres:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}
+        username: {{ .Values.postgres.username }}
+        password: {{ .Values.postgres.password }}
+        driver-class-name: org.postgresql.Driver
+
+      jpa:
+        hibernate:
+          ddl-auto: validate
+        open-in-view: false
+
+      flyway:
+        enabled: true
+        locations: classpath:db/migration
+        baseline-on-migrate: true
+
+      kafka:
+        bootstrap-servers: {{ .Release.Name }}-kafka:{{ .Values.kafka.internalPort }}
+        consumer:
+          group-id: fabric-consumer-group
+          auto-offset-reset: earliest
+        producer:
+          key-serializer: org.apache.kafka.common.serialization.StringSerializer
+          value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      data:
+        redis:
+          host: {{ .Release.Name }}-redis
+          port: {{ .Values.redis.port }}
+
+      jackson:
+        serialization:
+          write-dates-as-timestamps: false
+        default-property-inclusion: non_null
+
+    fabric:
+      kafka:
+        topics:
+          sws-inbound: sws.inbound.events
+          dept-inbound: dept.inbound.events
+          propagation-outbound: propagation.outbound.events
+          audit-trail: audit.trail.events
+          conflict-detected: conflict.detected.events
+          dlq: dlq.events
+
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health,info,metrics,prometheus
+      endpoint:
+        health:
+          show-details: always
+          probes:
+            enabled: true
+
+    conflict:
+      window:
+        seconds: 30
+
+    outbox:
+      worker:
+        fixedDelay: 5000
+
+    logging:
+      level:
+        com.karnataka.fabric: INFO
+        org.springframework.kafka: WARN

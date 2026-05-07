@@ -1,0 +1,156 @@
+# ════════════════════════════════════════════════════════════════
+# Karnataka Integration Fabric — Helm values
+# ════════════════════════════════════════════════════════════════
+
+global:
+  namespace: karnataka-fabric
+
+# ── fabric-api ───────────────────────────────────────────────
+fabricApi:
+  image:
+    repository: karnataka-fabric/fabric-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 2
+  port: 8080
+  profiles: "default"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  probes:
+    readiness:
+      path: /actuator/health/readiness
+      initialDelaySeconds: 20
+      periodSeconds: 10
+    liveness:
+      path: /actuator/health/liveness
+      initialDelaySeconds: 30
+      periodSeconds: 15
+
+# ── Dashboard (Next.js) ─────────────────────────────────────
+dashboard:
+  image:
+    repository: karnataka-fabric/dashboard
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ── PostgreSQL ───────────────────────────────────────────────
+postgres:
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  replicas: 1
+  port: 5432
+  database: fabric_db
+  username: fabric
+  password: fabric
+  storage:
+    size: 5Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+# ── Kafka + Zookeeper ────────────────────────────────────────
+zookeeper:
+  image:
+    repository: confluentinc/cp-zookeeper
+    tag: "7.5.0"
+  replicas: 1
+  port: 2181
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+kafka:
+  image:
+    repository: confluentinc/cp-kafka
+    tag: "7.5.0"
+  replicas: 1
+  port: 9092
+  internalPort: 29092
+  storage:
+    size: 5Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# ── Redis ────────────────────────────────────────────────────
+redis:
+  image:
+    repository: redis
+    tag: "7-alpine"
+  replicas: 1
+  port: 6379
+  maxMemory: 128mb
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 192Mi
+
+# ── Mock External Systems (WireMock) ────────────────────────
+mocks:
+  image:
+    repository: wiremock/wiremock
+    tag: "3.5.4"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  sws:
+    port: 8081
+  factories:
+    port: 8082
+  shopEstab:
+    port: 8083
+
+# ── Ingress ──────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  hosts:
+    api:
+      host: fabric-api.local
+      paths:
+        - path: /
+          pathType: Prefix
+    dashboard:
+      host: fabric-dashboard.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []

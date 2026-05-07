@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-fabric-api
+  labels:
+    app.kubernetes.io/name: fabric-api
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.fabricApi.replicas }}
+  selector:
+    matchLabels:
+      app: fabric-api
+  template:
+    metadata:
+      labels:
+        app: fabric-api
+        app.kubernetes.io/name: fabric-api
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: fabric-api
+          image: "{{ .Values.fabricApi.image.repository }}:{{ .Values.fabricApi.image.tag }}"
+          imagePullPolicy: {{ .Values.fabricApi.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.fabricApi.port }}
+              name: http
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.fabricApi.profiles }}"
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: /config/
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.fabricApi.probes.readiness.path }}
+              port: {{ .Values.fabricApi.port }}
+            initialDelaySeconds: {{ .Values.fabricApi.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.fabricApi.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.fabricApi.probes.liveness.path }}
+              port: {{ .Values.fabricApi.port }}
+            initialDelaySeconds: {{ .Values.fabricApi.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.fabricApi.probes.liveness.periodSeconds }}
+          resources:
+            requests:
+              cpu: {{ .Values.fabricApi.resources.requests.cpu }}
+              memory: {{ .Values.fabricApi.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.fabricApi.resources.limits.cpu }}
+              memory: {{ .Values.fabricApi.resources.limits.memory }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ .Release.Name }}-fabric-config

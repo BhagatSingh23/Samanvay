@@ -1,0 +1,58 @@
+{{- $mocks := dict "sws" .Values.mocks.sws "factories" .Values.mocks.factories "shop-estab" .Values.mocks.shopEstab }}
+{{- range $name, $config := $mocks }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-mock-{{ $name }}
+  labels:
+    app.kubernetes.io/name: mock-{{ $name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-{{ $name }}
+  template:
+    metadata:
+      labels:
+        app: mock-{{ $name }}
+        app.kubernetes.io/name: mock-{{ $name }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+    spec:
+      containers:
+        - name: wiremock
+          image: "{{ $.Values.mocks.image.repository }}:{{ $.Values.mocks.image.tag }}"
+          ports:
+            - containerPort: 8080
+              name: http
+          args: ["--verbose"]
+          readinessProbe:
+            httpGet:
+              path: /__admin/mappings
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: {{ $.Values.mocks.resources.requests.cpu }}
+              memory: {{ $.Values.mocks.resources.requests.memory }}
+            limits:
+              cpu: {{ $.Values.mocks.resources.limits.cpu }}
+              memory: {{ $.Values.mocks.resources.limits.memory }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-mock-{{ $name }}
+  labels:
+    app.kubernetes.io/name: mock-{{ $name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+spec:
+  selector:
+    app: mock-{{ $name }}
+  ports:
+    - port: {{ $config.port }}
+      targetPort: 8080
+      name: http
+{{- end }}

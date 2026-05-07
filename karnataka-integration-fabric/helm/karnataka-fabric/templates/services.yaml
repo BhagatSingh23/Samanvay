@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-fabric-api
+  labels:
+    app.kubernetes.io/name: fabric-api
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app: fabric-api
+  ports:
+    - port: {{ .Values.fabricApi.port }}
+      targetPort: {{ .Values.fabricApi.port }}
+      name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-dashboard
+  labels:
+    app.kubernetes.io/name: dashboard
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app: dashboard
+  ports:
+    - port: {{ .Values.dashboard.port }}
+      targetPort: {{ .Values.dashboard.port }}
+      name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - port: {{ .Values.postgres.port }}
+      targetPort: {{ .Values.postgres.port }}
+      name: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-zookeeper
+  labels:
+    app.kubernetes.io/name: zookeeper
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  clusterIP: None
+  selector:
+    app: zookeeper
+  ports:
+    - port: {{ .Values.zookeeper.port }}
+      targetPort: {{ .Values.zookeeper.port }}
+      name: client
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-kafka
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  clusterIP: None
+  selector:
+    app: kafka
+  ports:
+    - port: {{ .Values.kafka.internalPort }}
+      targetPort: {{ .Values.kafka.internalPort }}
+      name: internal
+    - port: {{ .Values.kafka.port }}
+      targetPort: {{ .Values.kafka.port }}
+      name: external
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redis
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: {{ .Values.redis.port }}
+      targetPort: {{ .Values.redis.port }}
+      name: redis
