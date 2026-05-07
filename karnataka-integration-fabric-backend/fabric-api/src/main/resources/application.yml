@@ -6,9 +6,9 @@ spring:
     name: karnataka-integration-fabric
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/fabric_db
-    username: fabric
-    password: fabric
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:

@@ -15,10 +15,10 @@ COPY fabric-audit/pom.xml       fabric-audit/pom.xml
 COPY fabric-api/pom.xml         fabric-api/pom.xml
 
 # Download dependencies (cached layer)
-RUN ./mvnw dependency:go-offline -B -q
+RUN mvn dependency:go-offline -B -q
 
 COPY . .
-RUN chmod +x mvnw && ./mvnw clean package -DskipTests -B -q
+RUN mvn clean package -DskipTests -B -q
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine AS runtime
@@ -34,7 +34,8 @@ USER fabric
 EXPOSE 8080
 
 ENTRYPOINT ["java", \
-  "-XX:+UseZGC", \
+  "-XX:+UseSerialGC", \
+  "-Xss512k", \
   "-XX:MaxRAMPercentage=75.0", \
   "-Djava.security.egd=file:/dev/./urandom", \
   "-jar", "app.jar"]
