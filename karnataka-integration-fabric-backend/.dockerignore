@@ -1,6 +1,5 @@
 target/
 */target/
-.mvn/
 !mvnw
 !mvnw.cmd
 .git/

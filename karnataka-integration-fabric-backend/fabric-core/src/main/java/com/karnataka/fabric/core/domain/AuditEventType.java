@@ -34,5 +34,8 @@ public enum AuditEventType {
     DLQ_PARKED,
 
     /** Schema drift detected — expected fields missing from a department API response. */
-    SCHEMA_DRIFT_DETECTED
+    SCHEMA_DRIFT_DETECTED,
+
+    /** A natural-language query was executed against the audit database via the dashboard. */
+    NL_QUERY_EXECUTED
 }

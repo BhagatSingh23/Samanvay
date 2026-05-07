@@ -60,6 +60,27 @@ fabric:
     partitions:
       high: 6
       low: 3
+  nlquery:
+    enabled: true
+    llm-provider: anthropic
+    model: claude-sonnet-4-20250514
+    max-result-rows: 200
+    api-key: ${LLM_API_KEY:placeholder}
+  escalation:
+    enabled: true
+    check-interval-ms: 60000
+    default-sla-minutes: 240
+    default-fallback-policy: SOURCE_PRIORITY
+    level2-extension-seconds: 3600
+  health-scoring:
+    enabled: true
+    window-hours: 24
+    cache-ttl-seconds: 60
+    history-cron: "0 0 * * * *"
+    grade-thresholds:
+      a: 90
+      b: 75
+      c: 60
 
 # ── Actuator ──────────────────────────────────────────────────
 

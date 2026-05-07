@@ -1,6 +1,7 @@
 "use client";
 import { useBannerStats } from "../lib/hooks";
 import { IconActivity, IconShield, IconInbox } from "./icons";
+import NotificationBell from "./NotificationBell";
 
 function StatCard({ icon: Icon, label, value, color, pulse }) {
   return (
@@ -23,7 +24,7 @@ function StatCard({ icon: Icon, label, value, color, pulse }) {
   );
 }
 
-export default function TopBanner() {
+export default function TopBanner({ onNavigateToConflicts }) {
   const { data, isLoading } = useBannerStats();
   const stats = data || {};
 
@@ -74,6 +75,7 @@ export default function TopBanner() {
             />
           </>
         )}
+        <NotificationBell onNavigateToConflicts={onNavigateToConflicts} />
       </div>
     </div>
   );

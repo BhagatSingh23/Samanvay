@@ -13,6 +13,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Set the backend URL so Next.js bakes it into the standalone server config
+ENV API_URL=http://fabric-api:8080
 RUN npm run build
 
 # ── Stage 3: Runtime ─────────────────────────────────────────

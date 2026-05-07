@@ -94,7 +94,7 @@ services:
 
   dashboard:
     build:
-      context: ./dashboard
+      context: ../karnataka-integration-fabric-dashboard-frontend
       dockerfile: Dockerfile
     container_name: fabric-dashboard
     ports:

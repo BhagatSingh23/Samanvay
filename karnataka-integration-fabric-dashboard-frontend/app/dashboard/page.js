@@ -6,12 +6,16 @@ import UbidTrace from "../components/UbidTrace";
 import ConflictQueue from "../components/ConflictQueue";
 import DeadLetterQueue from "../components/DeadLetterQueue";
 import SystemHealth from "../components/SystemHealth";
+import NlQueryTab from "../components/NlQueryTab";
+import DeptHealthTab from "../components/DeptHealthTab";
 import {
   IconActivity,
   IconSearch,
   IconShield,
   IconInbox,
   IconHeart,
+  IconMessageCircle,
+  IconBarChart,
 } from "../components/icons";
 
 const TABS = [
@@ -20,6 +24,8 @@ const TABS = [
   { id: "conflicts", label: "Conflict Queue",   icon: IconShield },
   { id: "dlq",       label: "Dead Letter Queue", icon: IconInbox },
   { id: "health",    label: "System Health",     icon: IconHeart },
+  { id: "nlquery",   label: "Ask the Fabric",    icon: IconMessageCircle },
+  { id: "depthealth",label: "Dept Health",       icon: IconBarChart },
 ];
 
 export default function DashboardPage() {
@@ -37,7 +43,7 @@ export default function DashboardPage() {
 
       <div className="relative z-10 flex flex-col flex-1 max-w-[1440px] mx-auto w-full px-4 py-4 gap-4">
         {/* ── Top banner ─────────────────────────────────── */}
-        <TopBanner />
+        <TopBanner onNavigateToConflicts={() => setActiveTab("conflicts")} />
 
         {/* ── Tab bar ────────────────────────────────────── */}
         <div className="glass-card overflow-hidden flex flex-col flex-1">
@@ -71,6 +77,8 @@ export default function DashboardPage() {
             {activeTab === "conflicts" && <ConflictQueue />}
             {activeTab === "dlq" && <DeadLetterQueue />}
             {activeTab === "health" && <SystemHealth />}
+            {activeTab === "nlquery" && <NlQueryTab />}
+            {activeTab === "depthealth" && <DeptHealthTab onNavigate={(tab) => setActiveTab(tab)} />}
           </div>
         </div>
       </div>

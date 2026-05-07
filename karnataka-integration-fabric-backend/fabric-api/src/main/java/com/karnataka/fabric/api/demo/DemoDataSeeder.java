@@ -79,6 +79,7 @@ public class DemoDataSeeder {
         seedScene3_ConflictWindow();
         seedScene4_DLQ();
         seedHistoricalAuditTrail();
+        seedHealthHistory();
     }
 
     // ════════════════════════════════════════════════════════════
@@ -242,7 +243,7 @@ public class DemoDataSeeder {
                 INSERT INTO conflict_hold_queue
                     (hold_id, conflict_id, event_id, ubid, service_type,
                      source_system_id, payload, status)
-                VALUES (?, ?, ?, 'KA-2024-003', 'ADDRESS_CHANGE', 'SWS', ?, 'HELD')
+                VALUES (?, ?, ?, 'KA-2024-003', 'ADDRESS_CHANGE', 'SWS', ?::jsonb, 'HELD')
                 """,
                 UUID.randomUUID(), conflictId, UUID.fromString(event1Id), toJson(payload1));
 
@@ -250,7 +251,7 @@ public class DemoDataSeeder {
                 INSERT INTO conflict_hold_queue
                     (hold_id, conflict_id, event_id, ubid, service_type,
                      source_system_id, payload, status)
-                VALUES (?, ?, ?, 'KA-2024-003', 'ADDRESS_CHANGE', 'DEPT_FACTORIES', ?, 'HELD')
+                VALUES (?, ?, ?, 'KA-2024-003', 'ADDRESS_CHANGE', 'DEPT_FACTORIES', ?::jsonb, 'HELD')
                 """,
                 UUID.randomUUID(), conflictId, UUID.fromString(event2Id), toJson(payload2));
 
@@ -286,7 +287,7 @@ public class DemoDataSeeder {
                     (outbox_id, event_id, ubid, target_system_id,
                      translated_payload, status, attempt_count,
                      next_attempt_at, last_error, created_at)
-                VALUES (?, ?, 'KA-2024-004', 'FACTORIES', ?, 'FAILED', 5, ?, ?, ?)
+                VALUES (?, ?, 'KA-2024-004', 'FACTORIES', ?::jsonb, 'FAILED', 5, ?, ?, ?)
                 """,
                 UUID.randomUUID(), UUID.fromString(eventId),
                 toJson(Map.of("addr_line_1", "12 RESIDENCY ROAD", "postal_code", "560025")),
@@ -299,7 +300,7 @@ public class DemoDataSeeder {
                 INSERT INTO dead_letter_queue
                     (dlq_id, event_id, ubid, target_system_id,
                      translated_payload, failure_reason, parked_at, resolved)
-                VALUES (?, ?, 'KA-2024-004', 'FACTORIES', ?,
+                VALUES (?, ?, 'KA-2024-004', 'FACTORIES', ?::jsonb,
                         'HTTP 503 Service Unavailable — FACTORIES API down. Exhausted 5/5 retries with exponential backoff.',
                         ?, false)
                 """,
@@ -358,6 +359,88 @@ public class DemoDataSeeder {
     }
 
     // ════════════════════════════════════════════════════════════
+    // Department Health History (7-day trend data)
+    // ════════════════════════════════════════════════════════════
+
+    private void seedHealthHistory() {
+        log.info("  Seeding 7-day department health history …");
+
+        // DEPT_FACTORIES: consistently grade A
+        double[] factoryScores = {95, 94, 96, 91, 93, 95, 92};
+        int[][] factoryMetrics = {
+            // dlq, conflicts, drift, latency, events
+            {0, 0, 0, 450, 120},
+            {0, 1, 0, 520, 115},
+            {0, 0, 0, 380, 130},
+            {0, 1, 0, 610, 108},
+            {0, 0, 0, 490, 122},
+            {0, 0, 0, 410, 125},
+            {0, 1, 0, 550, 118}
+        };
+
+        // DEPT_SHOP_ESTAB: grade B
+        double[] shopScores = {80, 78, 82, 75, 77, 79, 76};
+        int[][] shopMetrics = {
+            {1, 1, 0, 1200, 95},
+            {2, 1, 0, 1350, 90},
+            {1, 0, 0, 980, 100},
+            {2, 2, 0, 1500, 85},
+            {1, 1, 0, 1400, 88},
+            {1, 1, 0, 1100, 92},
+            {2, 2, 0, 1450, 87}
+        };
+
+        // DEPT_REVENUE: degrading from C to D
+        double[] revenueScores = {70, 65, 58, 55, 52, 48, 54};
+        int[][] revenueMetrics = {
+            {0, 1, 0, 2200, 60},
+            {1, 2, 1, 2800, 55},
+            {2, 2, 2, 3200, 48},
+            {2, 3, 2, 3500, 42},
+            {3, 3, 2, 3800, 38},
+            {4, 3, 2, 4200, 35},
+            {3, 2, 2, 3600, 40}
+        };
+
+        seedDeptHistory("FACTORIES", factoryScores, factoryMetrics);
+        seedDeptHistory("SHOP_ESTAB", shopScores, shopMetrics);
+        seedDeptHistory("REVENUE", revenueScores, revenueMetrics);
+
+        log.info("  ✓ 7-day health history seeded for 3 departments");
+    }
+
+    private void seedDeptHistory(String deptId, double[] scores, int[][] metrics) {
+        for (int day = 0; day < scores.length; day++) {
+            double score = scores[day];
+            String grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : "D";
+            int[] m = metrics[day];
+
+            String metricsJson = toJson(Map.of(
+                "deptId", deptId,
+                "score", score,
+                "grade", grade,
+                "successRate", score / 100.0,
+                "dlqCount", m[0],
+                "conflictCount", m[1],
+                "driftAlertCount", m[2],
+                "avgLatencyMs", m[3],
+                "totalEventsLast24h", m[4]
+            ));
+
+            // day 0 = 6 days ago, day 6 = today
+            int daysAgo = scores.length - 1 - day;
+
+            jdbcTemplate.update(
+                """
+                INSERT INTO dept_health_history(dept_id, score, grade, window_date, metrics, computed_at)
+                VALUES (?, ?, ?, CURRENT_DATE - CAST(? || ' days' AS INTERVAL), ?::jsonb, now())
+                ON CONFLICT (dept_id, window_date) DO NOTHING
+                """,
+                deptId, score, grade, String.valueOf(daysAgo), metricsJson);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
     // Helpers
     // ════════════════════════════════════════════════════════════
 
@@ -369,7 +452,7 @@ public class DemoDataSeeder {
                 INSERT INTO event_ledger
                     (event_id, ubid, source_system_id, service_type,
                      event_timestamp, ingestion_timestamp, payload, checksum, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)
                 """,
                 UUID.fromString(eventId), ubid, sourceSystemId, serviceType,
                 Timestamp.from(eventTimestamp), Timestamp.from(ingestionTimestamp),

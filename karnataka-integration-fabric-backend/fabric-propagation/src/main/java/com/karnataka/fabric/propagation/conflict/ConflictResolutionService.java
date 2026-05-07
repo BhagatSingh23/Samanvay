@@ -4,6 +4,7 @@ import com.karnataka.fabric.core.domain.AuditEventType;
 import com.karnataka.fabric.core.domain.CanonicalServiceRequest;
 import com.karnataka.fabric.core.domain.PropagationStatus;
 import com.karnataka.fabric.core.service.AuditService;
+import com.karnataka.fabric.propagation.escalation.ConflictEscalationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -44,11 +45,14 @@ public class ConflictResolutionService {
 
     private final JdbcTemplate jdbcTemplate;
     private final AuditService auditService;
+    private final Optional<ConflictEscalationService> conflictEscalationService;
 
     public ConflictResolutionService(JdbcTemplate jdbcTemplate,
-                                      AuditService auditService) {
+                                      AuditService auditService,
+                                      Optional<ConflictEscalationService> conflictEscalationService) {
         this.jdbcTemplate = jdbcTemplate;
         this.auditService = auditService;
+        this.conflictEscalationService = conflictEscalationService;
     }
 
     // ── Main resolution entry point ────────────────────────────
@@ -185,6 +189,15 @@ public class ConflictResolutionService {
 
         // Audit records for both events
         writeAudit(event1, event2, conflict, ConflictResolutionPolicy.HOLD_FOR_REVIEW, null);
+
+        // Register SLA escalation for this HOLD_FOR_REVIEW conflict
+        conflictEscalationService.ifPresent(svc -> {
+            try {
+                svc.registerEscalation(conflictId, event1.ubid(), event1.serviceType());
+            } catch (Exception e) {
+                log.warn("Failed to register escalation for conflict {}: {}", conflictId, e.getMessage());
+            }
+        });
 
         return new ResolvedConflict(
                 conflictId.toString(), null, null,

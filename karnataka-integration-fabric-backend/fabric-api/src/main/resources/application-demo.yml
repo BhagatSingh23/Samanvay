@@ -8,9 +8,7 @@
 # - Wider conflict window for easier demo triggering
 # - Slower outbox worker to observe lifecycle in real-time
 
-spring:
-  profiles:
-    include: local
+
 
 # ── Wider conflict window for demo ─────────────────────────
 conflict:

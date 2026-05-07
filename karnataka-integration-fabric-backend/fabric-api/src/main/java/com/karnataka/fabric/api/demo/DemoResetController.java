@@ -3,6 +3,7 @@ package com.karnataka.fabric.api.demo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,10 +36,13 @@ public class DemoResetController {
 
     private final JdbcTemplate jdbcTemplate;
     private final DemoDataSeeder seeder;
+    private final StringRedisTemplate redisTemplate;
 
-    public DemoResetController(JdbcTemplate jdbcTemplate, DemoDataSeeder seeder) {
+    public DemoResetController(JdbcTemplate jdbcTemplate, DemoDataSeeder seeder,
+                                StringRedisTemplate redisTemplate) {
         this.jdbcTemplate = jdbcTemplate;
         this.seeder = seeder;
+        this.redisTemplate = redisTemplate;
     }
 
     /**
@@ -59,6 +63,9 @@ public class DemoResetController {
         // Order matters: delete child rows first to avoid FK issues
         // (our schema has no FKs but being safe for future additions)
         String[] tables = {
+                "dept_health_history",
+                "notifications",
+                "conflict_escalations",
                 "dead_letter_queue",
                 "propagation_outbox",
                 "conflict_hold_queue",
@@ -73,7 +80,18 @@ public class DemoResetController {
             log.info("  Cleared {} — {} row(s) deleted", table, deleted);
         }
 
-        // ── 2. Re-seed ──────────────────────────────────────
+        // ── 2. Invalidate Redis health cache ────────────────
+        try {
+            var keys = redisTemplate.keys("health:dept:*");
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+                log.info("  Cleared {} Redis health cache keys", keys.size());
+            }
+        } catch (Exception e) {
+            log.warn("  Failed to clear Redis health cache: {}", e.getMessage());
+        }
+
+        // ── 3. Re-seed ──────────────────────────────────────
         seeder.seedAll();
 
         // ── 3. Build response ───────────────────────────────

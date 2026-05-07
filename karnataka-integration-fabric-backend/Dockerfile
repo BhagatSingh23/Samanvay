@@ -21,7 +21,7 @@ COPY fabric-api/pom.xml         fabric-api/pom.xml
 RUN ./mvnw dependency:go-offline -B -q
 
 COPY . .
-RUN ./mvnw clean package -DskipTests -B -q
+RUN chmod +x mvnw && ./mvnw clean package -DskipTests -B -q
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine AS runtime
