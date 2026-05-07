@@ -12,6 +12,8 @@ public class ConflictEscalation {
     private String fallbackPolicy;
     private String status;
     private Instant notifiedAt;
+    private String notifiedChannel;
+    private Instant autoResolvedAt;
     private Instant createdAt;
 
     public UUID getEscalationId() { return escalationId; }
@@ -30,6 +32,10 @@ public class ConflictEscalation {
     public void setStatus(String status) { this.status = status; }
     public Instant getNotifiedAt() { return notifiedAt; }
     public void setNotifiedAt(Instant notifiedAt) { this.notifiedAt = notifiedAt; }
+    public String getNotifiedChannel() { return notifiedChannel; }
+    public void setNotifiedChannel(String notifiedChannel) { this.notifiedChannel = notifiedChannel; }
+    public Instant getAutoResolvedAt() { return autoResolvedAt; }
+    public void setAutoResolvedAt(Instant autoResolvedAt) { this.autoResolvedAt = autoResolvedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }
