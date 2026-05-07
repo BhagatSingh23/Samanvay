@@ -6,34 +6,37 @@ import com.karnataka.fabric.adapters.translation.SchemaTranslatorService;
 import com.karnataka.fabric.adapters.translation.TranslationResult;
 import com.karnataka.fabric.core.domain.AuditEventType;
 import com.karnataka.fabric.core.domain.CanonicalServiceRequest;
+import com.karnataka.fabric.core.domain.PropagationStatus;
 import com.karnataka.fabric.core.service.AuditService;
+import com.karnataka.fabric.propagation.conflict.ConflictCheckResult;
+import com.karnataka.fabric.propagation.conflict.ConflictDetector;
+import com.karnataka.fabric.propagation.conflict.ConflictResolutionPolicy;
 import com.karnataka.fabric.propagation.idempotency.IdempotencyResult;
 import com.karnataka.fabric.propagation.idempotency.IdempotencyService;
 import com.karnataka.fabric.propagation.outbox.OutboxEntry;
 import com.karnataka.fabric.propagation.outbox.OutboxRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.*;
+import java.util.Optional;
 
 /**
  * Main orchestrator for event propagation through the integration fabric.
  *
  * <h3>Propagation flow:</h3>
  * <ol>
- *   <li>Determine target systems from the UBID registry:
- *       <ul>
- *         <li>SWS-origin events → all department systems where the UBID is registered</li>
- *         <li>DEPT-origin events → SWS only (reverse propagation not yet implemented,
- *             targets other depts)</li>
- *       </ul>
- *   </li>
- *   <li>For each target, translate the canonical payload via {@link SchemaTranslatorService}</li>
+ *   <li>Determine target systems from the UBID registry</li>
+ *   <li>For each target, translate the canonical payload</li>
  *   <li>Acquire idempotency lock for each (event, target) pair</li>
- *   <li>If lock acquired: insert row into {@code propagation_outbox}</li>
- *   <li>{@link com.karnataka.fabric.propagation.outbox.OutboxWorker} picks up and dispatches</li>
+ *   <li>Run conflict detection — if conflict found, resolve per policy</li>
+ *   <li>If lock acquired and no blocking conflict: insert into outbox</li>
+ *   <li>{@link com.karnataka.fabric.propagation.outbox.OutboxWorker}
+ *       picks up and dispatches</li>
  * </ol>
  */
 @Service
@@ -44,21 +47,27 @@ public class PropagationOrchestrator {
     private final DepartmentRegistry departmentRegistry;
     private final SchemaTranslatorService schemaTranslatorService;
     private final IdempotencyService idempotencyService;
+    private final Optional<ConflictDetector> conflictDetector;
     private final OutboxRepository outboxRepository;
     private final AuditService auditService;
+    private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
     public PropagationOrchestrator(DepartmentRegistry departmentRegistry,
                                     SchemaTranslatorService schemaTranslatorService,
                                     IdempotencyService idempotencyService,
+                                    Optional<ConflictDetector> conflictDetector,
                                     OutboxRepository outboxRepository,
                                     AuditService auditService,
+                                    JdbcTemplate jdbcTemplate,
                                     ObjectMapper objectMapper) {
         this.departmentRegistry = departmentRegistry;
         this.schemaTranslatorService = schemaTranslatorService;
         this.idempotencyService = idempotencyService;
+        this.conflictDetector = conflictDetector;
         this.outboxRepository = outboxRepository;
         this.auditService = auditService;
+        this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
     }
 
@@ -78,10 +87,9 @@ public class PropagationOrchestrator {
 
         String ubid = event.ubid();
         String sourceSystemId = event.sourceSystemId();
-        String serviceType = event.serviceType();
 
         log.info("Propagating event: eventId={}, ubid={}, source={}, serviceType={}",
-                event.eventId(), ubid, sourceSystemId, serviceType);
+                event.eventId(), ubid, sourceSystemId, event.serviceType());
 
         // Step 1: Determine target systems
         List<String> targets = resolveTargets(sourceSystemId);
@@ -93,7 +101,7 @@ public class PropagationOrchestrator {
 
         log.debug("Resolved {} target(s) for ubid={}: {}", targets.size(), ubid, targets);
 
-        // Steps 2-4: For each target — translate, idempotency check, enqueue
+        // Steps 2-5: For each target — translate, idempotency, conflict, enqueue
         for (String targetDeptId : targets) {
             propagateToTarget(event, targetDeptId);
         }
@@ -129,7 +137,22 @@ public class PropagationOrchestrator {
             return;
         }
 
-        // Step 4: Lock acquired — insert into propagation_outbox
+        // Step 4: Conflict detection (BEFORE inserting to outbox)
+        ConflictCheckResult conflictResult = checkForConflict(event);
+
+        if (conflictResult.conflictDetected()) {
+            boolean shouldProceed = handleConflict(event, conflictResult);
+            if (!shouldProceed) {
+                // Release idempotency lock — event is held for review
+                String fingerprint = idempotencyService.computeFingerprint(
+                        ubid, event.serviceType(), event.payload(), targetDeptId);
+                idempotencyService.releaseLock(fingerprint);
+                return;
+            }
+            // If shouldProceed=true, this event is the winner — continue to outbox
+        }
+
+        // Step 5: Lock acquired, no blocking conflict — insert into propagation_outbox
         String fingerprint = idempotencyService.computeFingerprint(
                 ubid, event.serviceType(), event.payload(), targetDeptId);
 
@@ -177,6 +200,154 @@ public class PropagationOrchestrator {
         } catch (Exception e) {
             log.warn("Failed to write DISPATCHED audit for eventId={}, target={}: {}",
                     eventId, targetDeptId, e.getMessage());
+        }
+    }
+
+    // ── Conflict detection ──────────────────────────────────────
+
+    /**
+     * Checks for conflicts using the Redis ZSET windowed detector.
+     * If Redis is unavailable or the ConflictDetector bean is absent,
+     * gracefully returns no conflict to avoid blocking propagation.
+     */
+    private ConflictCheckResult checkForConflict(CanonicalServiceRequest event) {
+        if (conflictDetector.isEmpty()) {
+            log.debug("ConflictDetector not available (Redis disabled?), skipping conflict check");
+            return ConflictCheckResult.noConflict();
+        }
+        try {
+            return conflictDetector.get().check(event);
+        } catch (Exception e) {
+            log.warn("Conflict detection failed (Redis unavailable?), proceeding without: {}",
+                    e.getMessage());
+            return ConflictCheckResult.noConflict();
+        }
+    }
+
+    /**
+     * Handles a detected conflict by creating a ConflictRecord and
+     * applying the resolution policy.
+     *
+     * @return {@code true} if the incoming event is the winner and should
+     *         proceed to the outbox; {@code false} if the event should be
+     *         held (MANUAL_REVIEW) or is the loser (SUPERSEDED)
+     */
+    private boolean handleConflict(CanonicalServiceRequest incomingEvent,
+                                    ConflictCheckResult conflict) {
+        String eventId = incomingEvent.eventId();
+        String ubid = incomingEvent.ubid();
+        String conflictingEventId = conflict.conflictingEventId();
+        ConflictResolutionPolicy policy = conflict.policyToApply();
+
+        log.info("Resolving conflict: eventId={} vs {} on field={}, policy={}",
+                eventId, conflictingEventId, conflict.fieldInDispute(), policy);
+
+        // Determine winner based on policy
+        String winningEventId;
+        boolean incomingIsWinner;
+
+        switch (policy) {
+            case LAST_WRITER_WINS -> {
+                // Latest ingestion timestamp wins — incoming is always latest
+                winningEventId = eventId;
+                incomingIsWinner = true;
+            }
+            case SOURCE_PRIORITY -> {
+                // SWS always wins over DEPT sources
+                if ("SWS".equalsIgnoreCase(incomingEvent.sourceSystemId())) {
+                    winningEventId = eventId;
+                    incomingIsWinner = true;
+                } else {
+                    winningEventId = conflictingEventId;
+                    incomingIsWinner = false;
+                }
+            }
+            case MANUAL_REVIEW -> {
+                // Hold both events — neither proceeds
+                winningEventId = null;
+                incomingIsWinner = false;
+                log.info("MANUAL_REVIEW: holding eventId={} and {} for conflict on {}",
+                        eventId, conflictingEventId, conflict.fieldInDispute());
+            }
+            default -> {
+                winningEventId = eventId;
+                incomingIsWinner = true;
+            }
+        }
+
+        // Persist conflict record
+        persistConflictRecord(ubid, eventId, conflictingEventId,
+                policy, winningEventId, conflict.fieldInDispute());
+
+        // Mark loser as SUPERSEDED
+        if (winningEventId != null) {
+            String loserId = winningEventId.equals(eventId) ? conflictingEventId : eventId;
+            markEventSuperseded(loserId, winningEventId);
+        }
+
+        // Write conflict audit
+        try {
+            auditService.recordAudit(
+                    eventId, ubid,
+                    incomingEvent.sourceSystemId(), null,
+                    AuditEventType.CONFLICT_DETECTED,
+                    Map.of("conflictingEventId", conflictingEventId,
+                           "fieldInDispute", conflict.fieldInDispute() != null
+                                   ? conflict.fieldInDispute() : "UNKNOWN"),
+                    Map.of("policy", policy.name(),
+                           "winningEventId", winningEventId != null ? winningEventId : "PENDING"));
+        } catch (Exception e) {
+            log.warn("Failed to write conflict audit: {}", e.getMessage());
+        }
+
+        return incomingIsWinner;
+    }
+
+    // ── Persistence helpers ─────────────────────────────────────
+
+    private void persistConflictRecord(String ubid, String event1Id, String event2Id,
+                                        ConflictResolutionPolicy policy,
+                                        String winningEventId, String fieldInDispute) {
+        try {
+            UUID conflictId = UUID.randomUUID();
+            Instant resolvedAt = winningEventId != null ? Instant.now() : null;
+
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO conflict_records
+                        (conflict_id, ubid, event1_id, event2_id, resolution_policy,
+                         winning_event_id, resolved_at, field_in_dispute)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    conflictId,
+                    ubid,
+                    UUID.fromString(event1Id),
+                    UUID.fromString(event2Id),
+                    policy.name(),
+                    winningEventId != null ? UUID.fromString(winningEventId) : null,
+                    resolvedAt != null ? java.sql.Timestamp.from(resolvedAt) : null,
+                    fieldInDispute);
+
+            log.info("Persisted conflict record: conflictId={}, winner={}",
+                    conflictId, winningEventId);
+
+        } catch (Exception e) {
+            log.error("Failed to persist conflict record: {}", e.getMessage(), e);
+        }
+    }
+
+    private void markEventSuperseded(String loserEventId, String winnerEventId) {
+        try {
+            int updated = jdbcTemplate.update(
+                    "UPDATE event_ledger SET status = ? WHERE event_id = ?",
+                    PropagationStatus.SUPERSEDED.name(),
+                    UUID.fromString(loserEventId));
+
+            if (updated > 0) {
+                log.info("Marked event {} as SUPERSEDED by {}", loserEventId, winnerEventId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to mark event {} as SUPERSEDED: {}", loserEventId, e.getMessage());
         }
     }
 

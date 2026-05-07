@@ -13,6 +13,11 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
 
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
   sql:
     init:
       mode: always
@@ -44,6 +49,10 @@ drift:
 outbox:
   worker:
     fixedDelay: 999999999
+
+conflict:
+  window:
+    seconds: 5
 
 resilience4j:
   circuitbreaker:

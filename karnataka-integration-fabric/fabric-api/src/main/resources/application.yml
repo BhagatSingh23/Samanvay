@@ -92,6 +92,12 @@ outbox:
   worker:
     fixedDelay: 5000
 
+# ── Conflict Detection ───────────────────────────────────────
+
+conflict:
+  window:
+    seconds: 30
+
 # ── Resilience4j ──────────────────────────────────────────────
 
 resilience4j:

@@ -31,10 +31,12 @@ spring:
       mode: always
       schema-locations: classpath:local-schema.sql
 
-  # ── Kafka disabled (mock in-memory) ─────────────────────────
+  # ── Kafka and Redis disabled (mock in-memory) ────────────────
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
 
   jackson:
     serialization:
